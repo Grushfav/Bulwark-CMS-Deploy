@@ -16,6 +16,9 @@ bulwark-cms-frontend/.env
 .env.development.local
 .env.test.local
 .env.production.local
+.env.cursor
+.env.vercel
+.env.azure
 
 # logs
 *.log

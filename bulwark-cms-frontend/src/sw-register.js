@@ -57,18 +57,17 @@ export function isAppInstalled() {
 export function showInstallPrompt() {
   if ('BeforeInstallPromptEvent' in window) {
     window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('📱 Install prompt event captured');
       e.preventDefault();
       
       // Store the event for later use
       window.deferredPrompt = e;
       
       // Show custom install button or prompt
-      console.log('📱 Install prompt available');
+      console.log('📱 Install prompt stored and available');
       
-      // You can trigger this from a button click
-      // installButton.addEventListener('click', () => {
-      //   window.deferredPrompt.prompt();
-      // });
+      // Dispatch a custom event to notify components
+      window.dispatchEvent(new CustomEvent('installPromptAvailable', { detail: e }));
     });
   }
 }

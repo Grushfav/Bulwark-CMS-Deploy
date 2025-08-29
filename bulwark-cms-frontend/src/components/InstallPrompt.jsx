@@ -12,36 +12,89 @@ export default function InstallPrompt() {
                        window.navigator.standalone === true;
 
     if (isInstalled) {
+      console.log('📱 App already installed, hiding prompt');
+      return;
+    }
+
+    // Don't show install prompt on login page to avoid interference
+    if (window.location.pathname === '/login') {
+      console.log('📱 On login page, hiding install prompt');
+      return;
+    }
+
+    // Check if app meets PWA criteria
+    const checkPWACriteria = () => {
+      const hasManifest = !!document.querySelector('link[rel="manifest"]');
+      const hasServiceWorker = 'serviceWorker' in navigator;
+      const isHTTPS = window.location.protocol === 'https:';
+      
+      console.log('📱 PWA Criteria Check:', {
+        hasManifest,
+        hasServiceWorker,
+        isHTTPS,
+        userAgent: navigator.userAgent
+      });
+      
+      return hasManifest && hasServiceWorker && isHTTPS;
+    };
+
+    if (!checkPWACriteria()) {
+      console.log('📱 App does not meet PWA criteria');
       return;
     }
 
     // Listen for install prompt
     const handleBeforeInstallPrompt = (e) => {
+      console.log('📱 Install prompt event received');
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
     };
 
+    // Listen for custom install prompt event
+    const handleInstallPromptAvailable = (e) => {
+      console.log('📱 Custom install prompt event received');
+      setDeferredPrompt(e.detail);
+      setShowPrompt(true);
+    };
+
+    // Check if prompt is already available
+    if (window.deferredPrompt) {
+      console.log('📱 Install prompt already available');
+      setDeferredPrompt(window.deferredPrompt);
+      setShowPrompt(true);
+    }
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('installPromptAvailable', handleInstallPromptAvailable);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('installPromptAvailable', handleInstallPromptAvailable);
     };
   }, []);
 
   const handleInstall = async () => {
+    console.log('📱 Install button clicked, deferredPrompt:', !!deferredPrompt);
+    
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      if (outcome === 'accepted') {
-        console.log('📱 App installation accepted');
-        setShowPrompt(false);
-      } else {
-        console.log('📱 App installation declined');
+      try {
+        console.log('📱 Calling deferredPrompt.prompt()');
+        const { outcome } = await deferredPrompt.prompt();
+        
+        if (outcome === 'accepted') {
+          console.log('📱 App installation accepted');
+          setShowPrompt(false);
+        } else {
+          console.log('📱 App installation declined');
+        }
+        
+        setDeferredPrompt(null);
+      } catch (error) {
+        console.error('📱 Error during install prompt:', error);
       }
-      
-      setDeferredPrompt(null);
+    } else {
+      console.log('📱 No deferredPrompt available');
     }
   };
 

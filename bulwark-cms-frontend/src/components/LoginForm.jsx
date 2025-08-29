@@ -36,7 +36,19 @@ const LoginForm = () => {
     } else {
       const errorMessage = result.error || 'Login failed. Please check your credentials.';
       setError(errorMessage);
-      toast.error(errorMessage);
+      
+      // Show different toast for rate limiting
+      if (result.isRateLimited) {
+        toast.error(errorMessage, {
+          duration: 8000, // Show longer for rate limiting
+          action: {
+            label: 'Wait',
+            onClick: () => toast.info('Please wait before trying again.')
+          }
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     }
     
     setLoading(false);
@@ -65,8 +77,18 @@ const LoginForm = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <Alert variant="destructive" className="animate-fade-in">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert 
+                  variant={error.includes('Too many login attempts') ? "destructive" : "destructive"} 
+                  className="animate-fade-in"
+                >
+                  <AlertDescription>
+                    {error}
+                    {error.includes('Too many login attempts') && (
+                      <div className="mt-2 text-sm">
+                        💡 <strong>Tip:</strong> This is a security feature to prevent unauthorized access attempts.
+                      </div>
+                    )}
+                  </AlertDescription>
                 </Alert>
               )}
               

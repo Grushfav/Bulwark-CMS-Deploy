@@ -36,9 +36,22 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
+      // Handle rate limiting specifically
+      if (error.response?.status === 429) {
+        const retryAfter = error.response?.data?.retryAfter || 15;
+        return {
+          success: false,
+          error: `Too many login attempts. Please wait ${retryAfter} minutes before trying again.`,
+          isRateLimited: true,
+          retryAfter
+        };
+      }
+      
+      // Handle other errors
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: error.response?.data?.error || error.response?.data?.message || 'Login failed. Please check your credentials.',
+        isRateLimited: false
       };
     }
   };

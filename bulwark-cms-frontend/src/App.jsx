@@ -14,6 +14,7 @@ import Reports from './components/Reports';
 import TeamManagement from './components/TeamManagement';
 import ContentManagement from './components/ContentManagement';
 import UserProfile from './components/UserProfile';
+import InstallPrompt from './components/InstallPrompt';
 import { Toaster } from 'sonner';
 import './App.css';
 
@@ -126,6 +127,7 @@ function App() {
           </Routes>
         </Router>
         <Toaster />
+        <InstallPrompt />
         </GoalsProvider>
       </AuthProvider>
     </ThemeProvider>

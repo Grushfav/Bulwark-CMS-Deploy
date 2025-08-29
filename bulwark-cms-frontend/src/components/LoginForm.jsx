@@ -132,7 +132,7 @@ const LoginForm = () => {
             
             <div className="mt-6 text-center">
               <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                <p className="font-medium mb-1">Demo Credentials:</p>
+                <p className="font-medium mb-1">Production Ready:</p>
                 <p>Manager: manager@bulwark.com / manager123</p>
               </div>
             </div>

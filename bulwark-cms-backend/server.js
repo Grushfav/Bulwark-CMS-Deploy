@@ -36,11 +36,35 @@ server.use(helmet({
 }));
 
 // CORS configuration
+const corsOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
+
+console.log('🔧 CORS Configuration:', {
+  CORS_ORIGIN: process.env.CORS_ORIGIN,
+  parsedOrigins: corsOrigins,
+  environment: process.env.NODE_ENV
+});
+
+// Enhanced CORS configuration
 server.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.log('🚫 CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // Rate limiting - More appropriate for development
@@ -107,6 +131,18 @@ server.get('/health', (req, res) => {
 
 // API routes
 server.use('/api', app);
+
+// Debug middleware to log all requests
+server.use((req, res, next) => {
+  console.log('🌐 Incoming request:', {
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    userAgent: req.headers['user-agent'],
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
 
 // Performance monitoring middleware
 app.use((req, res, next) => {

@@ -1,27 +1,30 @@
 // Service Worker Registration for PWA
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('📱 Service Worker registered successfully:', registration.scope);
-          
-          // Check for updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available
-                console.log('📱 New version available');
-                showUpdateNotification();
-              }
-            });
+    // Add cache busting for local testing
+    const cacheBuster = Date.now();
+    const swUrl = `/sw.js?v=${cacheBuster}`;
+    
+    navigator.serviceWorker.register(swUrl)
+      .then((registration) => {
+        console.log('📱 Service Worker registered successfully:', registration.scope);
+        
+        // Force update for local testing
+        registration.update();
+        
+        // Check for updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateNotification();
+            }
           });
-        })
-        .catch((error) => {
-          console.error('📱 Service Worker registration failed:', error);
         });
-    });
+      })
+      .catch((error) => {
+        console.error('📱 Service Worker registration failed:', error);
+      });
   }
 }
 

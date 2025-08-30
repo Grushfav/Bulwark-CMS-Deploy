@@ -1,13 +1,17 @@
 // Configuration file using environment variables
 export const config = {
   // Get values from environment variables with fallbacks
-  apiUrl: 'https://bulwark-cms-deploy.onrender.com/api', // Force deployed backend
+  apiUrl: `http://localhost:5000/api?t=${Date.now()}`, // Local backend for testing with cache busting
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173',
-  environment: import.meta.env.VITE_ENVIRONMENT || 'production'
+  environment: import.meta.env.VITE_ENVIRONMENT || 'local'
 };
 
 // Helper function to get current API URL
 export const getApiUrl = () => {
+  // Force localhost for development
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
   return config.apiUrl;
 };
 

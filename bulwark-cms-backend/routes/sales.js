@@ -692,6 +692,69 @@ router.put('/:id', authenticateToken, validateSale, async (req, res) => {
   }
 });
 
+// PATCH /sales/:id/notes - Update sale notes only
+router.patch('/:id/notes', authenticateToken, [
+  body('notes').optional().trim().isLength({ min: 1 }).withMessage('Notes content is required if provided')
+], async (req, res) => {
+  try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: errors.array()
+      });
+    }
+
+    const saleId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { notes } = req.body;
+
+    // Get sale to check permissions
+    const existingSale = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+    
+    if (!existingSale || existingSale.length === 0) {
+      return res.status(404).json({
+        error: 'Sale not found',
+        code: 'SALE_NOT_FOUND'
+      });
+    }
+
+    const oldSaleData = existingSale[0];
+
+    // Check access permissions
+    if (userRole !== 'manager' && oldSaleData.agentId !== userId) {
+      return res.status(403).json({
+        error: 'Access denied to this sale',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // Update only the notes field
+    const updatedSale = await db.update(sales)
+      .set({
+        notes,
+        updatedAt: new Date()
+      })
+      .where(eq(sales.id, saleId))
+      .returning();
+
+    res.json({
+      message: 'Sale notes updated successfully',
+      sale: updatedSale[0]
+    });
+
+  } catch (error) {
+    console.error('Update sale notes error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
 // DELETE /sales/:id - Delete sale
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {

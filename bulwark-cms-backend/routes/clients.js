@@ -528,6 +528,65 @@ router.post('/:id/notes', authenticateToken, validateClientNote, async (req, res
   }
 });
 
+// GET /clients/:id/notes - Get all notes for a client
+router.get('/:id/notes', authenticateToken, async (req, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    const agentId = req.user.id;
+
+    // Check if client exists and user has access
+    const client = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+    
+    if (!client || client.length === 0) {
+      return res.status(404).json({
+        error: 'Client not found',
+        code: 'CLIENT_NOT_FOUND'
+      });
+    }
+
+    const clientData = client[0];
+
+    // Check access permissions
+    if (req.user.role !== 'manager' && clientData.agentId !== agentId) {
+      return res.status(403).json({
+        error: 'Access denied to this client',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get notes for this client
+    const notes = await db.select({
+      id: clientNotes.id,
+      note: clientNotes.note,
+      noteType: clientNotes.noteType,
+      isPrivate: clientNotes.isPrivate,
+      createdAt: clientNotes.createdAt,
+      updatedAt: clientNotes.updatedAt,
+      agent: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName
+      }
+    })
+    .from(clientNotes)
+    .leftJoin(users, eq(clientNotes.agentId, users.id))
+    .where(eq(clientNotes.clientId, clientId))
+    .orderBy(desc(clientNotes.createdAt));
+
+    res.json({
+      message: 'Notes retrieved successfully',
+      notes: notes
+    });
+
+  } catch (error) {
+    console.error('Get notes error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
 // POST /clients/bulk-import - Bulk import clients from CSV
 router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
   try {

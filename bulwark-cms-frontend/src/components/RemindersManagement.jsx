@@ -72,7 +72,6 @@ const ReminderForm = ({ reminder, onSave, onCancel }) => {
     reminder_time: '09:00',
     status: 'call_back',
     priority: 'medium',
-    notes: '',
     ...reminder,
   });
   const [loading, setLoading] = useState(false);
@@ -236,21 +235,10 @@ const ReminderForm = ({ reminder, onSave, onCancel }) => {
         <Label htmlFor="description">Description</Label>
         <textarea
           id="description"
-          className="w-full min-h-[80px] px-3 py-2 border border-input bg-background rounded-md text-sm"
+          className="w-full min-h-[60px] px-3 py-2 border border-input bg-background rounded-md text-sm"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Detailed description of what needs to be done..."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="notes">Personal Notes</Label>
-        <textarea
-          id="notes"
-          className="w-full min-h-[60px] px-3 py-2 border border-input bg-background rounded-md text-sm"
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="Additional notes or context..."
         />
       </div>
 

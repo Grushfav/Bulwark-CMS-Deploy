@@ -37,8 +37,8 @@ server.use(helmet({
 
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173'];
+  //? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  //: ['http://localhost:5173'];
 
 console.log('🔧 CORS Configuration:', {
   CORS_ORIGIN: process.env.CORS_ORIGIN,
@@ -79,20 +79,11 @@ const generalLimiter = rateLimit({
 // Stricter rate limiting for auth endpoints to prevent brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Allow 50 login attempts per 15 minutes (more reasonable)
+  max: 10, // Allow 10 login attempts per 15 minutes
   message: 'Too many login attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful logins
-  // Add more detailed error message
-  handler: (req, res) => {
-    res.status(429).json({
-      error: 'Too many login attempts',
-      message: 'Please wait a few minutes before trying again, or contact support if this persists.',
-      retryAfter: Math.ceil(15 * 60 / 60), // 15 minutes in minutes
-      code: 'RATE_LIMIT_EXCEEDED'
-    });
-  }
 });
 
 // Speed limiting - More lenient for development
@@ -109,20 +100,6 @@ const speedLimiter = slowDown({
 server.use('/api/auth', authLimiter); // Stricter for auth
 server.use('/api/', generalLimiter); // General rate limiting for other routes
 server.use('/api/', speedLimiter); // Speed limiting
-
-// Log rate limiting configuration
-console.log('🔒 Rate Limiting Configuration:', {
-  auth: {
-    windowMs: '15 minutes',
-    max: '50 requests',
-    endpoint: '/api/auth'
-  },
-  general: {
-    windowMs: '15 minutes', 
-    max: '1000 requests',
-    endpoint: '/api/*'
-  }
-});
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {

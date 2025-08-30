@@ -195,13 +195,13 @@ const ClientNotes = ({ client, onAddNote }) => {
           client.notes.map((note, index) => (
             <div key={index} className="p-3 bg-gray-50 rounded-lg">
               <div className="flex items-start justify-between">
-                <p className="text-sm text-gray-700 flex-1">{note.text}</p>
+                <p className="text-sm text-gray-700 flex-1">{note.note}</p>
                 <span className="text-xs text-gray-500 ml-2">
-                  {new Date(note.timestamp).toLocaleString()}
+                  {new Date(note.createdAt).toLocaleString()}
                 </span>
               </div>
               <div className="text-xs text-gray-400 mt-1">
-                Added by: {note.agent}
+                Added by: {note.agent?.firstName} {note.agent?.lastName}
               </div>
             </div>
           ))
@@ -269,9 +269,6 @@ const ClientsManagement = () => {
 
   const loadClients = async () => {
     try {
-      // Try to load from localStorage first (for notes)
-      const savedNotes = JSON.parse(localStorage.getItem('bulwark_client_notes') || '{}');
-
       // Fetch clients from API - both managers and agents get only their own clients
       const response = await clientsAPI.getClients({ agent_id: user?.id });
       
@@ -279,67 +276,42 @@ const ClientsManagement = () => {
       console.log('🔍 Clients data structure:', response.data);
       console.log('🔍 First client structure:', response.data.clients?.[0]);
       
-      const clientsWithNotes = (response.data.clients || []).map(client => ({
+      const clientsWithNotes = (response.data.clients || []).map(async (client) => ({
         ...client,
-        notes: savedNotes[client.id] || []
+        notes: await loadClientNotes(client.id) // Load notes for each client
       }));
       
-      console.log('🔍 Processed clients with notes:', clientsWithNotes.slice(0, 2));
-      setClients(clientsWithNotes);
+      console.log('🔍 Processed clients with notes:', (await Promise.all(clientsWithNotes)).slice(0, 2));
+      setClients(await Promise.all(clientsWithNotes));
     } catch (error) {
       console.error('Error loading clients:', error);
-      // Try to load from localStorage first
-      const savedClients = JSON.parse(localStorage.getItem('bulwark_clients') || '[]');
-      if (savedClients.length > 0) {
-        setClients(savedClients);
-        return;
-      }
-      
-      // Fallback to mock data if API fails and no localStorage data
-      const mockClients = [
-        {
-          id: 1,
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@email.com',
-          phone: '555-0101',
-          employer: 'ABC Corporation',
-          dateOfBirth: '1985-03-15',
-          status: 'client',
-          createdBy: 'john.agent@bulwark.com',
-          createdAt: new Date().toISOString(), // Add current date for testing
-          notes: []
-        },
-        {
-          id: 2,
-          firstName: 'Jane',
-          lastName: 'Smith',
-          email: 'jane.smith@email.com',
-          phone: '555-0102',
-          employer: 'XYZ Industries',
-          dateOfBirth: '1990-07-22',
-          status: 'prospect',
-          createdBy: 'jane.agent@bulwark.com',
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-          notes: []
-        },
-        {
-          id: 3,
-          firstName: 'Mike',
-          lastName: 'Johnson',
-          email: 'mike.johnson@email.com',
-          phone: '555-0103',
-          employer: 'Tech Solutions Inc',
-          dateOfBirth: '1978-11-08',
-          status: 'client',
-          createdBy: 'mike.agent@bulwark.com',
-          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days ago
-          notes: []
-        }
-      ];
-      setClients(mockClients);
+      toast.error('Failed to load clients');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load client notes from API
+  const loadClientNotes = async (clientId) => {
+    try {
+      const response = await clientsAPI.getClientNotes(clientId);
+      return response.data.notes || [];
+    } catch (error) {
+      console.error('Error loading client notes:', error);
+      return [];
+    }
+  };
+
+  // Save note to database via API
+  const saveClientNote = async (clientId, noteData) => {
+    try {
+      const response = await clientsAPI.addClientNote(clientId, noteData);
+      toast.success('Note saved successfully');
+      return response.data.note;
+    } catch (error) {
+      console.error('Error saving note:', error);
+      toast.error('Failed to save note');
+      throw error;
     }
   };
 
@@ -421,11 +393,6 @@ const ClientsManagement = () => {
       const updatedClients = clients.filter(c => c.id !== clientId);
       setClients(updatedClients);
 
-      // Remove notes for this client
-      const savedNotes = JSON.parse(localStorage.getItem('bulwark_client_notes') || '{}');
-      delete savedNotes[clientId];
-      localStorage.setItem('bulwark_client_notes', JSON.stringify(savedNotes));
-
       toast.success('Client deleted successfully');
       setIsDeleteDialogOpen(false);
       setClientToDelete(null);
@@ -440,12 +407,16 @@ const ClientsManagement = () => {
 
   const handleAddNote = async (clientId, noteText) => {
     try {
-      const newNote = {
-        text: noteText,
-        timestamp: new Date().toISOString(),
-        agent: user?.email || 'Unknown'
+      const noteData = {
+        note: noteText,
+        noteType: 'general',
+        isPrivate: false
       };
 
+      // Save note to database via API
+      const newNote = await saveClientNote(clientId, noteData);
+
+      // Update the client's notes in state
       const updatedClients = clients.map(client => {
         if (client.id === clientId) {
           return {
@@ -462,16 +433,12 @@ const ClientsManagement = () => {
         setSelectedClient(updatedClients.find(c => c.id === clientId));
       }
 
-      // Save notes to localStorage
-      const savedNotes = JSON.parse(localStorage.getItem('bulwark_client_notes') || '{}');
-      savedNotes[clientId] = updatedClients.find(c => c.id === clientId)?.notes || [];
-      localStorage.setItem('bulwark_client_notes', JSON.stringify(savedNotes));
+      // Clear the note input
+      // setNoteInputs(prev => ({ ...prev, [clientId]: '' })); // This state variable doesn't exist
 
-      // Also save updated clients
-      localStorage.setItem('bulwark_clients', JSON.stringify(updatedClients));
     } catch (error) {
       console.error('Error adding note:', error);
-      throw error;
+      // Error is already handled in saveClientNote
     }
   };
 

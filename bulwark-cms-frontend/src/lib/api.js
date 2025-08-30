@@ -3,6 +3,12 @@ import { getApiUrl } from '../config.js';
 
 const API_BASE_URL = getApiUrl();
 
+// Debug logging
+console.log('🔧 API Configuration Debug:');
+console.log('🔧 API_BASE_URL:', API_BASE_URL);
+console.log('🔧 Current hostname:', window.location.hostname);
+console.log('🔧 Config import:', import.meta.url);
+
 // Create axios instance with default config
 import axios from 'axios';
 
@@ -68,6 +74,9 @@ export const clientsAPI = {
   getClient: (id) => api.get(`/clients/${id}`),
   updateClient: (id, clientData) => api.put(`/clients/${id}`, clientData),
   deleteClient: (id) => api.delete(`/clients/${id}`),
+  // Client Notes API
+  getClientNotes: (clientId) => api.get(`/clients/${clientId}/notes`),
+  addClientNote: (clientId, noteData) => api.post(`/clients/${clientId}/notes`, noteData),
   bulkImportClients: (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -94,6 +103,7 @@ export const salesAPI = {
   createSale: (saleData) => api.post('/sales', saleData),
   getSale: (id) => api.get(`/sales/${id}`),
   updateSale: (id, saleData) => api.put(`/sales/${id}`, saleData),
+  updateSaleNotes: (id, notes) => api.patch(`/sales/${id}/notes`, { notes }),
   deleteSale: (id) => api.delete(`/sales/${id}`),
 };
 

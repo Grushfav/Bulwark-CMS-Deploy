@@ -44,6 +44,7 @@ import {
   TrendingUp,
   Users,
   Calendar,
+  MessageSquare,
 } from 'lucide-react';
 
 const SaleForm = ({ sale, onSave, onCancel, products }) => {
@@ -472,13 +473,6 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           placeholder="Additional notes about the sale..."
         />
-        {/* Temporary debug - remove after testing */}
-        <div className="text-xs text-gray-500">
-          Debug - Notes value: "{formData.notes}" (length: {formData.notes?.length || 0})
-        </div>
-        <div className="text-xs text-gray-500">
-          Debug - Sale notes: "{sale?.notes}" (length: {sale?.notes?.length || 0})
-        </div>
       </div>
 
              <DialogFooter>
@@ -498,6 +492,131 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
   );
 };
 
+const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
+  const [noteText, setNoteText] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim()) return;
+
+    setLoading(true);
+    try {
+      console.log('🔧 Saving note for sale:', sale.id);
+      console.log('🔧 Current notes:', sale.notes);
+      console.log('🔧 New note text:', noteText);
+      
+      // Create a new note entry
+      const newNoteEntry = `${new Date().toLocaleString()}: ${noteText}`;
+      
+      // Combine with existing notes
+      const updatedNotes = sale.notes 
+        ? `${sale.notes}\n\n${newNoteEntry}`
+        : newNoteEntry;
+
+      console.log('🔧 Updated notes to save:', updatedNotes);
+
+      // Use the dedicated notes endpoint
+      const response = await salesAPI.updateSaleNotes(sale.id, updatedNotes);
+      console.log('🔧 Notes update response:', response);
+      
+      // Call the parent's onSaveNote to refresh the sales list
+      onSaveNote();
+      
+      // Clear the note input
+      setNoteText('');
+      
+      toast.success('Note added successfully');
+    } catch (error) {
+      console.error('Error saving note:', error);
+      console.error('Error details:', error.response?.data);
+      toast.error('Failed to save note');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setNoteText('');
+    onOpenChange(false);
+  };
+
+  if (!sale) return null;
+
+  // Parse existing notes to display them nicely
+  const existingNotes = sale.notes 
+    ? sale.notes.split('\n\n').filter(note => note.trim())
+    : [];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Sale Notes - {sale.client?.firstName} {sale.client?.lastName}
+          </DialogTitle>
+          <DialogDescription>
+            View and add notes for this sale. Notes are timestamped and help track important details.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          {/* Display existing notes */}
+          {existingNotes.length > 0 ? (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Existing Notes ({existingNotes.length}):</Label>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {existingNotes.map((note, index) => {
+                  const [timestamp, ...contentParts] = note.split(': ');
+                  const content = contentParts.join(': ');
+                  return (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="text-sm text-gray-700 mb-1">{content}</div>
+                      <div className="text-xs text-gray-500">{timestamp}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No notes yet. Add a note to track important sale details.</p>
+            </div>
+          )}
+
+          {/* Add new note */}
+          <div className="space-y-2">
+            <Label htmlFor="newNote" className="text-sm font-medium">Add New Note:</Label>
+            <textarea
+              id="newNote"
+              className="w-full min-h-[80px] px-3 py-2 border border-input bg-background rounded-md text-sm resize-none"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add a new note about this sale..."
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            type="button" 
+            onClick={handleSaveNote} 
+            disabled={loading || !noteText.trim()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {loading ? 'Saving...' : 'Add Note'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const SalesTracking = () => {
   const { user, isManager, canAccessAllSales } = useAuth();
   const [sales, setSales] = useState([]);
@@ -509,6 +628,9 @@ const SalesTracking = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
+  // Notes dialog state
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [saleForNotes, setSaleForNotes] = useState(null);
   // Note: updateGoalProgress is not available in GoalsContext
   // Goal progress is updated automatically by the backend when sales are created
 
@@ -576,6 +698,21 @@ const SalesTracking = () => {
         toast.error('Failed to delete sale');
       }
     }
+  };
+
+  const handleOpenNotes = (sale) => {
+    setSaleForNotes(sale);
+    setShowNotesDialog(true);
+  };
+
+  const handleCloseNotes = () => {
+    setShowNotesDialog(false);
+    setSaleForNotes(null);
+  };
+
+  const handleSaveNote = () => {
+    // Refresh sales data after note is saved
+    fetchSales();
   };
 
   const handleDownload = async () => {
@@ -881,6 +1018,20 @@ const SalesTracking = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleOpenNotes(sale)}
+                            title="View/Edit Notes"
+                            className="relative"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            {sale.notes && (
+                              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                                {sale.notes.split('\n\n').filter(note => note.trim()).length}
+                              </span>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleEdit(sale)}
                           >
                             <Edit className="h-4 w-4" />
@@ -913,6 +1064,14 @@ const SalesTracking = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Notes Dialog */}
+      <SaleNotesDialog
+        sale={saleForNotes}
+        isOpen={showNotesDialog}
+        onOpenChange={setShowNotesDialog}
+        onSaveNote={handleSaveNote}
+      />
     </div>
   );
 };

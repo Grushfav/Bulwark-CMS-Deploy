@@ -10,7 +10,7 @@ const urlsToCache = [
   '/reminders',
   '/content',
   '/reports',
-  '/login',
+  '/profile',
   '/manifest.json',
   '/favicon.ico',
   '/apple-touch-icon.png',
@@ -20,14 +20,15 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
+  console.log('📱 Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('📱 Service Worker: Caching app shell');
+        console.log('📱 Caching app shell');
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
-        console.error('📱 Service Worker: Cache failed:', error);
+        console.error('📱 Cache installation failed:', error);
       })
   );
 });
@@ -39,40 +40,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API calls (always fetch fresh data)
-  if (event.request.url.includes('/api/')) {
+  // Skip chrome-extension and other unsupported schemes
+  if (event.request.url.startsWith('chrome-extension://') || 
+      event.request.url.startsWith('moz-extension://') ||
+      event.request.url.startsWith('ms-browser-extension://')) {
     return;
   }
 
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version if available
-        if (response) {
-          return response;
-        }
-
-        // Otherwise fetch from network
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache if not a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
+        // Return cached version or fetch from network
+        return response || fetch(event.request)
+          .then((fetchResponse) => {
+            // Check if we received a valid response
+            if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
+              return fetchResponse;
             }
 
             // Clone the response
-            const responseToCache = response.clone();
+            const responseToCache = fetchResponse.clone();
 
+            // Cache the fetched response
             caches.open(CACHE_NAME)
               .then((cache) => {
                 cache.put(event.request, responseToCache);
+              })
+              .catch((error) => {
+                console.error('📱 Cache put failed:', error);
               });
 
-            return response;
+            return fetchResponse;
           })
-          .catch(() => {
-            // If offline and no cache, show offline page
-            if (event.request.destination === 'document') {
+          .catch((error) => {
+            console.error('📱 Fetch failed:', error);
+            // Return a fallback response for navigation requests
+            if (event.request.mode === 'navigate') {
               return caches.match('/');
             }
           });

@@ -15,7 +15,7 @@ import {
   FileText, Download, Calendar, TrendingUp, Users, DollarSign, 
   Target, Activity, Filter, RefreshCw, Eye, FileSpreadsheet, AlertTriangle
 } from 'lucide-react';
-import { reportsAPI, userProfileAPI } from '../lib/api.js';
+import { reportsAPI, userProfileAPI, salesAPI } from '../lib/api.js';
 
 const Reports = () => {
   const [loading, setLoading] = useState(false);
@@ -24,6 +24,39 @@ const Reports = () => {
     startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
     endDate: new Date().toISOString().split('T')[0] // Today
   });
+  
+  // Date range presets
+  const datePresets = [
+    { label: 'Last 7 days', days: 7 },
+    { label: 'Last 30 days', days: 30 },
+    { label: 'Last 90 days', days: 90 },
+    { label: 'This year', days: null, isYear: true },
+    { label: 'Last year', days: null, isYear: true, isLastYear: true }
+  ];
+  
+  const applyDatePreset = (preset) => {
+    const today = new Date();
+    let startDate, endDate;
+    
+    if (preset.isYear) {
+      if (preset.isLastYear) {
+        const lastYear = today.getFullYear() - 1;
+        startDate = new Date(lastYear, 0, 1).toISOString().split('T')[0];
+        endDate = new Date(lastYear, 11, 31).toISOString().split('T')[0];
+      } else {
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+      }
+    } else {
+      const start = new Date(today);
+      start.setDate(today.getDate() - preset.days);
+      startDate = start.toISOString().split('T')[0];
+      endDate = today.toISOString().split('T')[0];
+    }
+    
+    setDateRange({ startDate, endDate });
+    toast.success(`Applied ${preset.label} date range`);
+  };
   const [selectedAgent, setSelectedAgent] = useState('all');
   const [reportData, setReportData] = useState({
     salesSummary: {
@@ -100,7 +133,7 @@ const Reports = () => {
         agentId: agentIdParam
       };
       
-      
+      console.log('🔍 Generating reports with params:', params);
       
       const reportResponse = await reportsAPI.getComprehensiveReport(params);
 
@@ -232,6 +265,11 @@ const Reports = () => {
 
   const exportToCSV = (data, filename) => {
     try {
+      if (!data || data.length === 0) {
+        toast.error('No data available to export');
+        return;
+      }
+      
       const csvContent = "data:text/csv;charset=utf-8," 
         + Object.keys(data[0]).join(",") + "\n"
         + data.map(row => Object.values(row).join(",")).join("\n");
@@ -248,6 +286,121 @@ const Reports = () => {
     } catch (error) {
       console.error('Export error:', error);
       toast.error(`Failed to export ${filename}`);
+    }
+  };
+
+  const exportToJSON = (data, filename) => {
+    try {
+      if (!data || data.length === 0) {
+        toast.error('No data available to export');
+        return;
+      }
+      
+      const jsonContent = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+      toast.success(`${filename} exported as JSON successfully!`);
+    } catch (error) {
+      console.error('JSON export error:', error);
+      toast.error(`Failed to export ${filename} as JSON`);
+    }
+  };
+
+  const exportAllReports = () => {
+    try {
+      const allData = {
+        salesSummary: memoizedReportData.salesSummary,
+        agentPerformance: memoizedReportData.agentPerformance,
+        clientAnalytics: memoizedReportData.clientAnalytics,
+        productPerformance: memoizedReportData.productPerformance,
+        monthlyTrends: memoizedReportData.monthlyTrends,
+        goalProgress: memoizedReportData.goalProgress,
+        exportDate: new Date().toISOString(),
+        dateRange: memoizedDateRange,
+        selectedAgent: selectedAgent
+      };
+      
+      exportToJSON(allData, 'comprehensive_reports');
+    } catch (error) {
+      console.error('Export all reports error:', error);
+      toast.error('Failed to export comprehensive reports');
+    }
+  };
+
+  const exportAgentSalesData = async () => {
+    try {
+      if (selectedAgent === 'all') {
+        toast.error('Please select a specific agent to export their sales data');
+        return;
+      }
+
+      // Get the agent name for the filename
+      const agent = memoizedAgents.find(a => a.id.toString() === selectedAgent);
+      const agentName = agent ? agent.fullName || `${agent.first_name} ${agent.last_name}` : 'Unknown Agent';
+      
+      // Use the existing sales API endpoint (same as Sales page)
+      const params = {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        agent_id: parseInt(selectedAgent),
+        limit: 100 // Maximum allowed by API validation
+      };
+
+      toast.info('Fetching detailed sales data...');
+      
+      const response = await salesAPI.getSales(params);
+      const salesData = response.data?.sales || response.data || [];
+      
+      if (salesData.length === 0) {
+        toast.error('No sales data found for the selected agent in the specified date range');
+        return;
+      }
+
+      // Format the data for export - using the same structure as the Sales page
+      const formattedData = salesData.map(sale => ({
+        'Sale ID': sale.id || 'N/A',
+        'Client Name': `${sale.client?.firstName || ''} ${sale.client?.lastName || ''}`.trim() || 'N/A',
+        'Client Email': sale.client?.email || 'N/A',
+        'Policy Number': sale.policyNumber || 'N/A',
+        'Product Name': sale.productName || 'N/A',
+        'Premium Amount': sale.premiumAmount || 0,
+        'Commission Amount': sale.commissionAmount || 0,
+        'Commission Percentage': sale.commissionRate ? `${sale.commissionRate}%` : '0%',
+        'Sale Date': sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
+        'Status': sale.status || 'Active',
+        'Agent Name': `${sale.agent?.firstName || ''} ${sale.agent?.lastName || ''}`.trim() || agentName,
+        'Agent Email': sale.agent?.email || 'N/A',
+        'Notes': sale.notes || ''
+      }));
+
+      // Create CSV content
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + Object.keys(formattedData[0]).join(",") + "\n"
+        + formattedData.map(row => Object.values(row).map(value => 
+          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+        ).join(",")).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `${agentName.replace(/\s+/g, '_')}_detailed_sales_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`Detailed sales data for ${agentName} exported successfully! (${salesData.length} records)`);
+    } catch (error) {
+      console.error('Export agent sales data error:', error);
+      toast.error(`Failed to export sales data: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -306,10 +459,31 @@ const Reports = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">Comprehensive business insights and performance analysis</p>
         </div>
-        <Button onClick={handleRefresh} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto justify-center sm:justify-start">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Generating...' : 'Refresh Reports'}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleRefresh} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto justify-center sm:justify-start">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Generating...' : 'Refresh Reports'}
+          </Button>
+          
+          <Select onValueChange={(value) => {
+            if (value === 'all') {
+              exportAllReports();
+            } else if (value === 'sales') {
+              exportToCSV(memoizedReportData.monthlyTrends, 'sales_analysis');
+            } else if (value === 'agents') {
+              exportToCSV(memoizedReportData.agentPerformance, 'agent_performance');
+            }
+          }}>
+            <SelectTrigger className="w-full sm:w-auto">
+              <SelectValue placeholder="Export Reports" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Export All Reports (JSON)</SelectItem>
+              <SelectItem value="sales">Export Sales Data (CSV)</SelectItem>
+              <SelectItem value="agents">Export Agent Performance (CSV)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Initial Loading State */}
@@ -377,6 +551,24 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Date Range Presets */}
+              <div className="mb-4">
+                <Label className="text-sm font-medium mb-2 block">Quick Date Ranges</Label>
+                <div className="flex flex-wrap gap-2">
+                  {datePresets.map((preset, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyDatePreset(preset)}
+                      className="text-xs"
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="startDate">Start Date</Label>
@@ -661,15 +853,37 @@ const Reports = () => {
 
             {/* Sales Analysis Tab */}
             <TabsContent value="sales" className="space-y-6">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <h2 className="text-2xl font-bold">Sales Analysis</h2>
-                <Button 
-                  onClick={() => exportToCSV(memoizedReportData.monthlyTrends, 'sales_analysis')}
-                  variant="outline"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select onValueChange={(value) => {
+                    if (value === 'monthly') {
+                      exportToCSV(memoizedReportData.monthlyTrends, 'monthly_sales_trends');
+                    } else if (value === 'products') {
+                      exportToCSV(memoizedReportData.productPerformance, 'product_performance');
+                    } else if (value === 'agent') {
+                      exportAgentSalesData();
+                    }
+                  }}>
+                    <SelectTrigger className="w-full sm:w-auto">
+                      <SelectValue placeholder="Export Sales Data" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Export Monthly Trends (CSV)</SelectItem>
+                      <SelectItem value="products">Export Product Performance (CSV)</SelectItem>
+                      <SelectItem value="agent">Export Agent Sales Data (CSV)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button 
+                    onClick={() => exportToCSV(memoizedReportData.monthlyTrends, 'sales_analysis')}
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export All
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -744,6 +958,124 @@ const Reports = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Agent Sales Performance Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div>
+                      <CardTitle>Agent Sales Performance</CardTitle>
+                      <CardDescription>Individual agent sales data and performance metrics</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => exportToCSV(memoizedReportData.agentPerformance, 'agent_sales_performance')}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export All Agents
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-3 font-medium">Agent</th>
+                          <th className="text-right p-3 font-medium">Sales Count</th>
+                          <th className="text-right p-3 font-medium">Total Premium</th>
+                          <th className="text-right p-3 font-medium">Total Commission</th>
+                          <th className="text-right p-3 font-medium">Avg Premium/Sale</th>
+                          <th className="text-right p-3 font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {memoizedReportData.agentPerformance.map((agent, index) => {
+                          const avgPremium = agent.sales > 0 ? agent.premium / agent.sales : 0;
+                          const agentId = agent.id || `agent_${index}`;
+                          
+                          return (
+                            <tr key={agentId} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-medium">
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant={index === 0 ? "default" : index === 1 ? "secondary" : "outline"}>
+                                    #{index + 1}
+                                  </Badge>
+                                  <span>{agent.name}</span>
+                                </div>
+                              </td>
+                              <td className="text-right p-3">
+                                <Badge variant="secondary" className="font-mono">
+                                  {agent.sales}
+                                </Badge>
+                              </td>
+                              <td className="text-right p-3 font-mono">
+                                {formatCurrency(agent.premium)}
+                              </td>
+                              <td className="text-right p-3 font-mono">
+                                {formatCurrency(agent.commission)}
+                              </td>
+                              <td className="text-right p-3 font-mono text-muted-foreground">
+                                {formatCurrency(avgPremium)}
+                              </td>
+                              <td className="text-right p-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Set the selected agent and export their data
+                                    setSelectedAgent(agentId.toString());
+                                    setTimeout(() => {
+                                      exportAgentSalesData();
+                                    }, 100);
+                                  }}
+                                  disabled={!agentId || agentId.toString().startsWith('agent_')}
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Export
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t bg-muted/50 font-medium">
+                          <td className="p-3">Team Total</td>
+                          <td className="text-right p-3">
+                            <Badge variant="outline" className="font-mono">
+                              {memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.sales, 0)}
+                            </Badge>
+                          </td>
+                          <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0))}
+                          </td>
+                          <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.commission, 0))}
+                          </td>
+                          <td className="text-right p-3 font-mono text-muted-foreground">
+                            {formatCurrency(
+                              memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0) / 
+                              Math.max(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.sales, 0), 1)
+                            )}
+                          </td>
+                          <td className="text-right p-3">-</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  
+                  {memoizedReportData.agentPerformance.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No agent performance data available for the selected date range</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Agent Performance Tab */}

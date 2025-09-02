@@ -1,18 +1,15 @@
 // Configuration file using environment variables
 export const config = {
-  // Get values from environment variables with fallbacks
-  apiUrl: `http://localhost:5000/api?t=${Date.now()}`, // Local backend for testing with cache busting
+  // Force localhost for development
+  apiUrl: 'http://localhost:5000/api',
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173',
-  environment: import.meta.env.VITE_ENVIRONMENT || 'local'
+  environment: 'local'
 };
 
 // Helper function to get current API URL
 export const getApiUrl = () => {
-  // Force localhost for development
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5000/api';
-  }
-  return config.apiUrl;
+  // Always use localhost for development
+  return 'http://localhost:5000/api';
 };
 
 // Helper function to get current frontend URL

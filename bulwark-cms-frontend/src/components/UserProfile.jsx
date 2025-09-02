@@ -947,22 +947,22 @@ const UsersTab = ({ users, onCreateUser, onUpdateUser, onDeleteUser, onReactivat
 
   // Filter users based on search and status
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && user.is_active && !user.deleted_at) ||
-                         (statusFilter === 'suspended' && !user.is_active && !user.deleted_at) ||
-                         (statusFilter === 'deleted' && user.deleted_at);
+                         (statusFilter === 'active' && user.isActive && !user.deletedAt) ||
+                         (statusFilter === 'suspended' && !user.isActive && !user.deletedAt) ||
+                         (statusFilter === 'deleted' && user.deletedAt);
     
     return matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (user) => {
-    if (user.deleted_at) {
+    if (user.deletedAt) {
       return <Badge variant="destructive" className="text-xs">Deleted</Badge>;
-    } else if (user.is_active) {
+    } else if (user.isActive) {
       return <Badge variant="default" className="text-xs">Active</Badge>;
     } else {
       return <Badge variant="secondary" className="text-xs">Suspended</Badge>;
@@ -1058,7 +1058,7 @@ const UsersTab = ({ users, onCreateUser, onUpdateUser, onDeleteUser, onReactivat
                   <TableCell>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-white">
-                        {user.first_name || user.firstName} {user.last_name || user.lastName}
+                        {user.firstName} {user.lastName}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {user.position || user.role || 'No position'}
@@ -1079,7 +1079,7 @@ const UsersTab = ({ users, onCreateUser, onUpdateUser, onDeleteUser, onReactivat
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      {!user.deleted_at && (
+                      {!user.deletedAt && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -1089,7 +1089,7 @@ const UsersTab = ({ users, onCreateUser, onUpdateUser, onDeleteUser, onReactivat
                           <Edit className="w-4 h-4" />
                         </Button>
                       )}
-                      {user.deleted_at ? (
+                      {user.deletedAt ? (
                         <Button
                           variant="default"
                           size="sm"
@@ -1414,19 +1414,43 @@ const CreateUserDialog = ({ open, onOpenChange, onCreateUser }) => {
 
 const EditUserDialog = ({ user, onClose, onUpdate }) => {
   const [formData, setFormData] = useState({
-    first_name: user.first_name,
-    last_name: user.last_name,
-    email: user.email,
-    role: user.role,
-    department: user.department,
-    position: user.position,
-    is_active: user.is_active
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    email: user.email || '',
+    role: user.role || 'agent',
+    department: user.department || '',
+    position: user.position || '',
+    isActive: user.isActive !== false
   });
+
+  // Update form data when user prop changes
+  useEffect(() => {
+    setFormData({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      role: user.role || 'agent',
+      department: user.department || '',
+      position: user.position || '',
+      isActive: user.isActive !== false
+    });
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await onUpdate(user.id, formData);
+      // Map frontend field names to backend field names
+      const mappedData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: formData.role,
+        department: formData.department,
+        position: formData.position,
+        isActive: formData.isActive
+      };
+      
+      await onUpdate(user.id, mappedData);
       onClose();
     } catch (error) {
       console.error('Error updating user:', error);
@@ -1445,8 +1469,8 @@ const EditUserDialog = ({ user, onClose, onUpdate }) => {
               <Label htmlFor="edit_first_name">First Name</Label>
               <Input
                 id="edit_first_name"
-                value={formData.first_name}
-                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 required
               />
             </div>
@@ -1454,8 +1478,8 @@ const EditUserDialog = ({ user, onClose, onUpdate }) => {
               <Label htmlFor="edit_last_name">Last Name</Label>
               <Input
                 id="edit_last_name"
-                value={formData.last_name}
-                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 required
               />
             </div>
@@ -1508,8 +1532,8 @@ const EditUserDialog = ({ user, onClose, onUpdate }) => {
             <input
               type="checkbox"
               id="edit_is_active"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
             />
             <Label htmlFor="edit_is_active">Active</Label>
           </div>

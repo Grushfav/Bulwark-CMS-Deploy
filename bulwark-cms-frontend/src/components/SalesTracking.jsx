@@ -717,20 +717,53 @@ const SalesTracking = () => {
 
   const handleDownload = async () => {
     try {
-      const response = await filesAPI.downloadSales();
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `sales_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      toast.info('Preparing sales data for export...');
+      
+      // Get user's own sales data (same as what they see on the page)
+      const response = await salesAPI.getSales({ limit: 100 });
+      const salesData = response.data?.sales || response.data || [];
+      
+      if (salesData.length === 0) {
+        toast.error('No sales data available to export');
+        return;
+      }
+
+      // Format the data for CSV export
+      const formattedData = salesData.map(sale => ({
+        'Sale ID': sale.id || 'N/A',
+        'Client Name': `${sale.client?.firstName || ''} ${sale.client?.lastName || ''}`.trim() || 'N/A',
+        'Client Email': sale.client?.email || 'N/A',
+        'Policy Number': sale.policyNumber || 'N/A',
+        'Product Name': sale.productName || 'N/A',
+        'Premium Amount': sale.premiumAmount || 0,
+        'Commission Amount': sale.commissionAmount || 0,
+        'Commission Rate (%)': sale.commissionRate || 0,
+        'Sale Date': sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
+        'Status': sale.status || 'Active',
+        'Agent Name': `${sale.agent?.firstName || ''} ${sale.agent?.lastName || ''}`.trim() || 'N/A',
+        'Agent Email': sale.agent?.email || 'N/A',
+        'Notes': sale.notes || ''
+      }));
+
+      // Create CSV content
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + Object.keys(formattedData[0]).join(",") + "\n"
+        + formattedData.map(row => Object.values(row).map(value => 
+          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+        ).join(",")).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `sales_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`Sales data exported successfully! (${salesData.length} records)`);
     } catch (error) {
-      setError('Failed to download sales');
+      console.error('Export sales data error:', error);
+      toast.error(`Failed to export sales data: ${error.response?.data?.error || error.message}`);
     }
   };
 

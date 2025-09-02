@@ -27,6 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from './ui/dialog';
 import {
   Select,
@@ -328,6 +329,9 @@ const PasswordResetDialog = ({ member, onPasswordReset, open, onOpenChange }) =>
           <DialogTitle>
             Reset Password for {safeGet(member, 'firstName', '')} {safeGet(member, 'lastName', '')}
           </DialogTitle>
+          <DialogDescription>
+            Enter a new password for this team member. The password must be at least 6 characters long.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -410,22 +414,56 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
   };
 
   const getStatusText = (member) => {
+    // DEBUG: Log the status determination process
+    console.log('🔍 getStatusText called with member:', {
+      id: member.id,
+      firstName: member.firstName,
+      isActive: member.isActive,
+      is_active: member.is_active,
+      deletedAt: member.deletedAt,
+      deleted_at: member.deleted_at
+    });
+    
     if (member.deletedAt || member.deleted_at) {
+      console.log('🔍 Status: Deleted (has deletedAt)');
       return 'Deleted';
     }
-    if (member.isActive === false || member.is_active === false) {
+    // Use the same logic as the isActive variable for consistency
+    const isActive = safeGet(member, 'isActive', true) !== false && safeGet(member, 'is_active', true) !== false;
+    console.log('🔍 Calculated isActive:', isActive);
+    
+    if (!isActive) {
+      console.log('🔍 Status: Suspended (!isActive)');
       return 'Suspended';
     }
+    console.log('🔍 Status: Active');
     return 'Active';
   };
 
   const getStatusType = (member) => {
+    // DEBUG: Log the status determination process
+    console.log('🔍 getStatusType called with member:', {
+      id: member.id,
+      firstName: member.firstName,
+      isActive: member.isActive,
+      is_active: member.is_active,
+      deletedAt: member.deletedAt,
+      deleted_at: member.deleted_at
+    });
+    
     if (member.deletedAt || member.deleted_at) {
+      console.log('🔍 Status Type: deleted (has deletedAt)');
       return 'deleted';
     }
-    if (member.isActive === false || member.is_active === false) {
+    // Use the same logic as the isActive variable for consistency
+    const isActive = safeGet(member, 'isActive', true) !== false && safeGet(member, 'is_active', true) !== false;
+    console.log('🔍 Calculated isActive for type:', isActive);
+    
+    if (!isActive) {
+      console.log('🔍 Status Type: suspended (!isActive)');
       return 'suspended';
     }
+    console.log('🔍 Status Type: active');
     return 'active';
   };
 
@@ -671,19 +709,42 @@ const TeamManagement = () => {
         }
         
         // FIXED: Process team members with proper metrics mapping
-        const membersWithMetrics = teamMembersWithMetrics.map((member) => {
+        // Use users as the base data source to preserve isActive field
+        const membersWithMetrics = users.map((user) => {
+          // Find matching team data for metrics
+          const teamData = teamMembersWithMetrics.find(team => team.id === user.id);
+          
+          // DEBUG: Log the data merging process
+          console.log('🔍 Merging data for user:', {
+            userId: user.id,
+            userName: user.firstName,
+            userIsActive: user.isActive,
+            teamDataFound: !!teamData,
+            teamDataIsActive: teamData?.isActive
+          });
+          
           return {
-            ...member,
+            ...user, // Preserve all user data including isActive
+            // Add metrics from team data if available
+            totalSales: teamData?.totalSales || 0,
+            totalSalesCount: teamData?.totalSalesCount || 0,
+            totalRevenue: teamData?.totalRevenue || 0,
+            totalCommission: teamData?.totalCommission || 0,
+            totalClients: teamData?.totalClients || 0,
+            monthlySales: teamData?.monthlySales || 0,
+            monthlyCommission: teamData?.monthlyCommission || 0,
+            monthlyClients: teamData?.monthlyClients || 0,
+            monthlyProspects: teamData?.monthlyProspects || 0,
             metrics: {
-              total_sales: safeNumber(member.totalSales || member.total_sales || 0),
-              total_sales_count: safeNumber(member.totalSalesCount || member.total_sales_count || 0),
-              total_clients: safeNumber(member.totalClients || member.total_clients || 0),
-              monthly_sales: safeNumber(member.monthlySales || member.monthly_sales || 0),
-              monthly_commission: safeNumber(member.monthlyCommission || member.monthly_commission || 0),
-              monthly_clients: safeNumber(member.monthlyClients || member.monthly_clients || 0),
-              monthly_prospects: safeNumber(member.monthlyProspects || member.monthly_prospects || 0),
-              total_commission: safeNumber(member.totalCommission || member.total_commission || 0),
-              total_revenue: safeNumber(member.totalRevenue || member.total_revenue || 0)
+              total_sales: safeNumber(teamData?.totalSales || 0),
+              total_sales_count: safeNumber(teamData?.totalSalesCount || 0),
+              total_clients: safeNumber(teamData?.totalClients || 0),
+              monthly_sales: safeNumber(teamData?.monthlySales || 0),
+              monthly_commission: safeNumber(teamData?.monthlyCommission || 0),
+              monthly_clients: safeNumber(teamData?.monthlyClients || 0),
+              monthly_prospects: safeNumber(teamData?.monthlyProspects || 0),
+              total_commission: safeNumber(teamData?.totalCommission || 0),
+              total_revenue: safeNumber(teamData?.totalRevenue || 0)
             }
           };
         });

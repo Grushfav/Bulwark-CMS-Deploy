@@ -383,19 +383,19 @@ const Reports = () => {
       }));
 
       // Create CSV content
-      const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8," 
         + Object.keys(formattedData[0]).join(",") + "\n"
         + formattedData.map(row => Object.values(row).map(value => 
           typeof value === 'string' && value.includes(',') ? `"${value}"` : value
         ).join(",")).join("\n");
-      
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
       link.setAttribute("download", `${agentName.replace(/\s+/g, '_')}_detailed_sales_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
       
       toast.success(`Detailed sales data for ${agentName} exported successfully! (${salesData.length} records)`);
     } catch (error) {
@@ -461,9 +461,9 @@ const Reports = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={handleRefresh} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto justify-center sm:justify-start">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Generating...' : 'Refresh Reports'}
-          </Button>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Generating...' : 'Refresh Reports'}
+        </Button>
           
           <Select onValueChange={(value) => {
             if (value === 'all') {
@@ -542,15 +542,15 @@ const Reports = () => {
       {/* Main Content - Only show after initialization */}
       {isInitialized && (
         <>
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Filter className="h-5 w-5 mr-2" />
-                Report Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Filter className="h-5 w-5 mr-2" />
+            Report Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
               {/* Date Range Presets */}
               <div className="mb-4">
                 <Label className="text-sm font-medium mb-2 block">Quick Date Ranges</Label>
@@ -570,291 +570,291 @@ const Reports = () => {
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
+            <div>
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
                     value={memoizedDateRange.startDate}
-                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
+                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
                     value={memoizedDateRange.endDate}
-                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                  />
-                </div>
+                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
                 <div className="sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor="agent">Agent</Label>
+              <Label htmlFor="agent">Agent</Label>
                   <Select value={selectedAgent} onValueChange={setSelectedAgent} disabled={memoizedAgents.length === 0}>
-                    <SelectTrigger>
+                <SelectTrigger>
                       <SelectValue placeholder={memoizedAgents.length === 0 ? "Loading agents..." : "Select agent"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Agents</SelectItem>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
                       {memoizedAgents.map(agent => (
-                        <SelectItem key={agent.id} value={agent.id.toString()}>
+                    <SelectItem key={agent.id} value={agent.id.toString()}>
                           {agent.fullName || `${agent.first_name} ${agent.last_name}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
                   {memoizedAgents.length === 0 && (
                     <p className="text-xs text-gray-500 mt-1">Loading agent list...</p>
                   )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* Report Tabs */}
-          <Tabs defaultValue="overview" className="space-y-6">
+      {/* Report Tabs */}
+      <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="sales">Sales</TabsTrigger>
               <TabsTrigger value="agents">Agents</TabsTrigger>
               <TabsTrigger value="clients">Clients</TabsTrigger>
               <TabsTrigger value="goals">Goals</TabsTrigger>
-            </TabsList>
+        </TabsList>
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
               {/* Key Metrics - Improved Mobile Layout */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">Total Sales</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
                     <div className="text-xl sm:text-2xl font-bold">{memoizedReportData.salesSummary?.totalSales || 0}</div>
-                    <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                       {formatCurrency(memoizedReportData.salesSummary?.totalPremium || 0)} in premiums
-                    </p>
-                  </CardContent>
-                </Card>
+                </p>
+              </CardContent>
+            </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">Total Commission</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
                     <div className="text-xl sm:text-2xl font-bold">
                       {formatCurrency(memoizedReportData.salesSummary?.totalCommission || 0)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
+                </div>
+                <p className="text-xs text-muted-foreground">
                       Avg: {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)} per sale
-                    </p>
-                  </CardContent>
-                </Card>
+                </p>
+              </CardContent>
+            </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">Total Clients</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
                     <div className="text-xl sm:text-2xl font-bold">{memoizedReportData.clientAnalytics?.totalClients || 0}</div>
-                    <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                       {memoizedReportData.clientAnalytics?.totalProspects || 0} prospects
-                    </p>
-                  </CardContent>
-                </Card>
+                </p>
+              </CardContent>
+            </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">Conversion Rate</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
                     <div className="text-xl sm:text-2xl font-bold">
                       {formatPercentage(memoizedReportData.clientAnalytics?.conversionRate || 0)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Prospect to client conversion
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Prospect to client conversion
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Monthly Trends */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Monthly Sales Trends</CardTitle>
-                    <CardDescription>Sales volume and premium trends over time</CardDescription>
-                  </CardHeader>
-                  <CardContent>
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Monthly Trends */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Monthly Sales Trends</CardTitle>
+                <CardDescription>Sales volume and premium trends over time</CardDescription>
+              </CardHeader>
+              <CardContent>
                     <ChartErrorBoundary>
-                      <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={300}>
                         {loading ? (
                           <ChartLoadingState />
                         ) : memoizedReportData.monthlyTrends.length === 0 ? (
                           <ChartEmptyState />
                         ) : (
                           <AreaChart data={memoizedReportData.monthlyTrends}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" />
-                            <YAxis />
-                            <Tooltip 
-                              formatter={(value, name) => [
-                                name === 'premium' ? formatCurrency(value) : value,
-                                name === 'premium' ? 'Premium Amount' : 'Sales Count'
-                              ]}
-                              labelFormatter={(label) => `Month: ${label}`}
-                              contentStyle={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                border: '1px solid #ccc',
-                                borderRadius: '8px',
-                                padding: '12px'
-                              }}
-                            />
-                            <Legend />
-                            <Area type="monotone" dataKey="sales" stackId="1" stroke="#8884d8" fill="#8884d8" name="Sales Count" />
-                            <Area type="monotone" dataKey="premium" stackId="2" stroke="#82ca9d" fill="#82ca9d" name="Premium Amount" />
-                          </AreaChart>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        name === 'premium' ? formatCurrency(value) : value,
+                        name === 'premium' ? 'Premium Amount' : 'Sales Count'
+                      ]}
+                      labelFormatter={(label) => `Month: ${label}`}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '8px',
+                        padding: '12px'
+                      }}
+                    />
+                    <Legend />
+                    <Area type="monotone" dataKey="sales" stackId="1" stroke="#8884d8" fill="#8884d8" name="Sales Count" />
+                    <Area type="monotone" dataKey="premium" stackId="2" stroke="#82ca9d" fill="#82ca9d" name="Premium Amount" />
+                  </AreaChart>
                         )}
-                      </ResponsiveContainer>
+                </ResponsiveContainer>
                     </ChartErrorBoundary>
-                  </CardContent>
-                </Card>
+              </CardContent>
+            </Card>
 
-                {/* Product Performance */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Product Performance</CardTitle>
-                    <CardDescription>Sales distribution by product type</CardDescription>
-                  </CardHeader>
-                  <CardContent>
+            {/* Product Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Performance</CardTitle>
+                <CardDescription>Sales distribution by product type</CardDescription>
+              </CardHeader>
+              <CardContent>
                     <ChartErrorBoundary>
-                      <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={300}>
                         {loading ? (
                           <ChartLoadingState />
                         ) : memoizedReportData.productPerformance.length === 0 ? (
                           <ChartEmptyState />
                         ) : (
-                          <PieChart>
-                            <Pie
+                  <PieChart>
+                    <Pie
                               data={memoizedReportData.productPerformance}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="sales"
-                            >
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="sales"
+                    >
                               {memoizedReportData.productPerformance.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip 
-                              formatter={(value, name) => [
-                                value,
-                                'Sales Count'
-                              ]}
-                              contentStyle={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                border: '1px solid #ccc',
-                                borderRadius: '8px',
-                                padding: '12px'
-                              }}
-                            />
-                          </PieChart>
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        value,
+                        'Sales Count'
+                      ]}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '8px',
+                        padding: '12px'
+                      }}
+                    />
+                  </PieChart>
                         )}
-                      </ResponsiveContainer>
+                </ResponsiveContainer>
                     </ChartErrorBoundary>
-                  </CardContent>
-                </Card>
-              </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Monthly Trends Detailed Data Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Monthly Trends - Detailed Data</CardTitle>
-                  <CardDescription>Detailed breakdown of sales and premium amounts by month</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left p-3 font-medium">Month</th>
-                          <th className="text-right p-3 font-medium">Sales Count</th>
-                          <th className="text-right p-3 font-medium">Premium Amount</th>
-                          <th className="text-right p-3 font-medium">Avg Premium per Sale</th>
-                          <th className="text-right p-3 font-medium">Growth Rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+          {/* Monthly Trends Detailed Data Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Trends - Detailed Data</CardTitle>
+              <CardDescription>Detailed breakdown of sales and premium amounts by month</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Month</th>
+                      <th className="text-right p-3 font-medium">Sales Count</th>
+                      <th className="text-right p-3 font-medium">Premium Amount</th>
+                      <th className="text-right p-3 font-medium">Avg Premium per Sale</th>
+                      <th className="text-right p-3 font-medium">Growth Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                         {memoizedReportData.monthlyTrends.map((month, index) => {
                           const prevMonth = index > 0 ? memoizedReportData.monthlyTrends[index - 1] : null;
-                          const growthRate = prevMonth && prevMonth.sales > 0 
-                            ? ((month.sales - prevMonth.sales) / prevMonth.sales * 100).toFixed(1)
-                            : month.sales > 0 ? '100.0' : '0.0';
-                          
-                          return (
-                            <tr key={month.month} className="border-b hover:bg-muted/30 transition-colors">
-                              <td className="p-3 font-medium">{month.month}</td>
-                              <td className="text-right p-3">
-                                <Badge variant="secondary" className="font-mono">
-                                  {month.sales}
-                                </Badge>
-                              </td>
-                              <td className="text-right p-3 font-mono">
-                                {formatCurrency(month.premium)}
-                              </td>
-                              <td className="text-right p-3 font-mono text-muted-foreground">
-                                {month.sales > 0 ? formatCurrency(month.premium / month.sales) : '$0.00'}
-                              </td>
-                              <td className="text-right p-3">
-                                <Badge 
-                                  variant={parseFloat(growthRate) >= 0 ? "default" : "destructive"}
-                                  className="font-mono"
-                                >
-                                  {parseFloat(growthRate) >= 0 ? '+' : ''}{growthRate}%
-                                </Badge>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td className="p-3">Total</td>
+                      const growthRate = prevMonth && prevMonth.sales > 0 
+                        ? ((month.sales - prevMonth.sales) / prevMonth.sales * 100).toFixed(1)
+                        : month.sales > 0 ? '100.0' : '0.0';
+                      
+                      return (
+                        <tr key={month.month} className="border-b hover:bg-muted/30 transition-colors">
+                          <td className="p-3 font-medium">{month.month}</td>
                           <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              {memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.sales, 0)}
+                            <Badge variant="secondary" className="font-mono">
+                              {month.sales}
                             </Badge>
                           </td>
                           <td className="text-right p-3 font-mono">
-                            {formatCurrency(memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.premium, 0))}
+                            {formatCurrency(month.premium)}
                           </td>
                           <td className="text-right p-3 font-mono text-muted-foreground">
-                            {formatCurrency(
+                            {month.sales > 0 ? formatCurrency(month.premium / month.sales) : '$0.00'}
+                          </td>
+                          <td className="text-right p-3">
+                            <Badge 
+                              variant={parseFloat(growthRate) >= 0 ? "default" : "destructive"}
+                              className="font-mono"
+                            >
+                              {parseFloat(growthRate) >= 0 ? '+' : ''}{growthRate}%
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td className="p-3">Total</td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                              {memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.sales, 0)}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.premium, 0))}
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                        {formatCurrency(
                               memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.premium, 0) / 
                               Math.max(memoizedReportData.monthlyTrends.reduce((sum, month) => sum + month.sales, 0), 1)
-                            )}
-                          </td>
-                          <td className="text-right p-3">-</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                        )}
+                      </td>
+                      <td className="text-right p-3">-</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            {/* Sales Analysis Tab */}
-            <TabsContent value="sales" className="space-y-6">
+        {/* Sales Analysis Tab */}
+        <TabsContent value="sales" className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <h2 className="text-2xl font-bold">Sales Analysis</h2>
+            <h2 className="text-2xl font-bold">Sales Analysis</h2>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Select onValueChange={(value) => {
                     if (value === 'monthly') {
@@ -875,89 +875,89 @@ const Reports = () => {
                     </SelectContent>
                   </Select>
                   
-                  <Button 
+            <Button 
                     onClick={() => exportToCSV(memoizedReportData.monthlyTrends, 'sales_analysis')}
-                    variant="outline"
+              variant="outline"
                     className="w-full sm:w-auto"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
+            >
+              <Download className="h-4 w-4 mr-2" />
                     Export All
-                  </Button>
+            </Button>
                 </div>
-              </div>
+          </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Sales by Product */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Sales by Product</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Sales by Product */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Sales by Product</CardTitle>
+              </CardHeader>
+              <CardContent>
                     <ChartErrorBoundary>
-                      <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={300}>
                         {loading ? (
                           <ChartLoadingState />
                         ) : memoizedReportData.productPerformance.length === 0 ? (
                           <ChartEmptyState />
                         ) : (
                           <BarChart data={memoizedReportData.productPerformance}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip 
-                              formatter={(value, name) => [
-                                name === 'premium' ? formatCurrency(value) : value,
-                                name === 'premium' ? 'Premium' : name === 'commission' ? 'Commission' : 'Sales'
-                              ]}
-                              labelFormatter={(label) => `Product: ${label}`}
-                              contentStyle={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                border: '1px solid #ccc',
-                                borderRadius: '8px',
-                                padding: '12px'
-                              }}
-                            />
-                            <Legend />
-                            <Bar dataKey="sales" fill="#8884d8" name="Sales Count" />
-                            <Bar dataKey="premium" fill="#82ca9d" name="Premium Amount" />
-                          </BarChart>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        name === 'premium' ? formatCurrency(value) : value,
+                        name === 'premium' ? 'Premium' : name === 'commission' ? 'Commission' : 'Sales'
+                      ]}
+                      labelFormatter={(label) => `Product: ${label}`}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '8px',
+                        padding: '12px'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="sales" fill="#8884d8" name="Sales Count" />
+                    <Bar dataKey="premium" fill="#82ca9d" name="Premium Amount" />
+                  </BarChart>
                         )}
-                      </ResponsiveContainer>
+                </ResponsiveContainer>
                     </ChartErrorBoundary>
-                  </CardContent>
-                </Card>
+              </CardContent>
+            </Card>
 
-                {/* Product Performance Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Product Performance Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-2">Product</th>
-                            <th className="text-right p-2">Sales</th>
-                            <th className="text-right p-2">Premium</th>
-                            <th className="text-right p-2">Commission</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+            {/* Product Performance Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Performance Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Product</th>
+                        <th className="text-right p-2">Sales</th>
+                        <th className="text-right p-2">Premium</th>
+                        <th className="text-right p-2">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                           {memoizedReportData.productPerformance.map((product, index) => (
-                            <tr key={index} className="border-b">
-                              <td className="p-2 font-medium">{product.name}</td>
-                              <td className="text-right p-2">{product.sales}</td>
-                              <td className="text-right p-2">{formatCurrency(product.premium)}</td>
-                              <td className="text-right p-2">{formatCurrency(product.commission)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                        <tr key={index} className="border-b">
+                          <td className="p-2 font-medium">{product.name}</td>
+                          <td className="text-right p-2">{product.sales}</td>
+                          <td className="text-right p-2">{formatCurrency(product.premium)}</td>
+                          <td className="text-right p-2">{formatCurrency(product.commission)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
               {/* Agent Sales Performance Section */}
               <Card>
@@ -1076,441 +1076,441 @@ const Reports = () => {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+        </TabsContent>
 
-            {/* Agent Performance Tab */}
-            <TabsContent value="agents" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Agent Performance</h2>
-                <Button 
+        {/* Agent Performance Tab */}
+        <TabsContent value="agents" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Agent Performance</h2>
+            <Button 
                   onClick={() => exportToCSV(memoizedReportData.agentPerformance, 'agent_performance')}
-                  variant="outline"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
+              variant="outline"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Agent Performance Chart */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Agent Sales Comparison</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Agent Performance Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Sales Comparison</CardTitle>
+              </CardHeader>
+              <CardContent>
                     <ChartErrorBoundary>
-                      <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={300}>
                         {loading ? (
                           <ChartLoadingState />
                         ) : memoizedReportData.agentPerformance.length === 0 ? (
                           <ChartEmptyState />
                         ) : (
                           <BarChart data={memoizedReportData.agentPerformance}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip 
-                              formatter={(value, name) => [
-                                name === 'premium' || name === 'commission' ? formatCurrency(value) : value,
-                                name === 'premium' ? 'Premium' : name === 'commission' ? 'Commission' : 'Sales'
-                              ]}
-                              labelFormatter={(label) => `Agent: ${label}`}
-                              contentStyle={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                border: '1px solid #ccc',
-                                borderRadius: '8px',
-                                padding: '12px'
-                              }}
-                            />
-                            <Legend />
-                            <Bar dataKey="sales" fill="#8884d8" name="Sales Count" />
-                            <Bar dataKey="premium" fill="#82ca9d" name="Premium Amount" />
-                          </BarChart>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        name === 'premium' || name === 'commission' ? formatCurrency(value) : value,
+                        name === 'premium' ? 'Premium' : name === 'commission' ? 'Commission' : 'Sales'
+                      ]}
+                      labelFormatter={(label) => `Agent: ${label}`}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '8px',
+                        padding: '12px'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="sales" fill="#8884d8" name="Sales Count" />
+                    <Bar dataKey="premium" fill="#82ca9d" name="Premium Amount" />
+                  </BarChart>
                         )}
-                      </ResponsiveContainer>
+                </ResponsiveContainer>
                     </ChartErrorBoundary>
-                  </CardContent>
-                </Card>
+              </CardContent>
+            </Card>
 
-                {/* Agent Leaderboard */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Agent Leaderboard</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
+            {/* Agent Leaderboard */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Leaderboard</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
                       {memoizedReportData.agentPerformance.map((agent, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <Badge variant={index === 0 ? "default" : "secondary"}>
-                              #{index + 1}
-                            </Badge>
-                            <div>
-                              <p className="font-medium">{agent.name}</p>
-                              <p className="text-sm text-gray-600">{agent.sales} sales</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold">{formatCurrency(agent.premium)}</p>
-                            <p className="text-sm text-gray-600">{formatCurrency(agent.commission)} commission</p>
-                          </div>
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Badge variant={index === 0 ? "default" : "secondary"}>
+                          #{index + 1}
+                        </Badge>
+                        <div>
+                          <p className="font-medium">{agent.name}</p>
+                          <p className="text-sm text-gray-600">{agent.sales} sales</p>
                         </div>
-                      ))}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">{formatCurrency(agent.premium)}</p>
+                        <p className="text-sm text-gray-600">{formatCurrency(agent.commission)} commission</p>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Agent Performance Detailed Data Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Agent Performance - Detailed Metrics</CardTitle>
-                  <CardDescription>Comprehensive breakdown of agent performance with efficiency metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left p-3 font-medium">Agent</th>
-                          <th className="text-right p-3 font-medium">Sales Count</th>
-                          <th className="text-right p-3 font-medium">Total Premium</th>
-                          <th className="text-right p-3 font-medium">Total Commission</th>
-                          <th className="text-right p-3 font-medium">Avg Premium/Sale</th>
-                          <th className="text-right p-3 font-medium">Commission Rate</th>
-                          <th className="text-right p-3 font-medium">Performance Score</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+          {/* Agent Performance Detailed Data Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Performance - Detailed Metrics</CardTitle>
+              <CardDescription>Comprehensive breakdown of agent performance with efficiency metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Agent</th>
+                      <th className="text-right p-3 font-medium">Sales Count</th>
+                      <th className="text-right p-3 font-medium">Total Premium</th>
+                      <th className="text-right p-3 font-medium">Total Commission</th>
+                      <th className="text-right p-3 font-medium">Avg Premium/Sale</th>
+                      <th className="text-right p-3 font-medium">Commission Rate</th>
+                      <th className="text-right p-3 font-medium">Performance Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                         {memoizedReportData.agentPerformance.map((agent, index) => {
-                          const avgPremium = agent.sales > 0 ? agent.premium / agent.sales : 0;
-                          const commissionRate = agent.premium > 0 ? (agent.commission / agent.premium * 100) : 0;
-                          const performanceScore = Math.round((agent.sales * 0.4) + (avgPremium * 0.3) + (commissionRate * 0.3));
-                          
-                          return (
-                            <tr key={agent.name} className="border-b hover:bg-muted/30 transition-colors">
-                              <td className="p-3 font-medium">
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant={index === 0 ? "default" : index === 1 ? "secondary" : "outline"}>
-                                    #{index + 1}
-                                  </Badge>
-                                  <span>{agent.name}</span>
-                                </div>
-                              </td>
-                              <td className="text-right p-3">
-                                <Badge variant="secondary" className="font-mono">
-                                  {agent.sales}
-                                </Badge>
-                              </td>
-                              <td className="text-right p-3 font-mono">
-                                {formatCurrency(agent.premium)}
-                              </td>
-                              <td className="text-right p-3 font-mono">
-                                {formatCurrency(agent.commission)}
-                              </td>
-                              <td className="text-right p-3 font-mono text-muted-foreground">
-                                {formatCurrency(avgPremium)}
-                              </td>
-                              <td className="text-right p-3">
-                                <Badge variant="outline" className="font-mono">
-                                  {commissionRate.toFixed(1)}%
-                                </Badge>
-                              </td>
-                              <td className="text-right p-3">
-                                <Badge 
-                                  variant={performanceScore >= 80 ? "default" : performanceScore >= 60 ? "secondary" : "destructive"}
-                                  className="font-mono"
-                                >
-                                  {performanceScore}
-                                </Badge>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td className="p-3">Team Total</td>
+                      const avgPremium = agent.sales > 0 ? agent.premium / agent.sales : 0;
+                      const commissionRate = agent.premium > 0 ? (agent.commission / agent.premium * 100) : 0;
+                      const performanceScore = Math.round((agent.sales * 0.4) + (avgPremium * 0.3) + (commissionRate * 0.3));
+                      
+                      return (
+                        <tr key={agent.name} className="border-b hover:bg-muted/30 transition-colors">
+                          <td className="p-3 font-medium">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={index === 0 ? "default" : index === 1 ? "secondary" : "outline"}>
+                                #{index + 1}
+                              </Badge>
+                              <span>{agent.name}</span>
+                            </div>
+                          </td>
                           <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              {memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.sales, 0)}
+                            <Badge variant="secondary" className="font-mono">
+                              {agent.sales}
                             </Badge>
                           </td>
                           <td className="text-right p-3 font-mono">
-                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0))}
+                            {formatCurrency(agent.premium)}
                           </td>
                           <td className="text-right p-3 font-mono">
-                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.commission, 0))}
+                            {formatCurrency(agent.commission)}
                           </td>
                           <td className="text-right p-3 font-mono text-muted-foreground">
-                            {formatCurrency(
+                            {formatCurrency(avgPremium)}
+                          </td>
+                          <td className="text-right p-3">
+                            <Badge variant="outline" className="font-mono">
+                              {commissionRate.toFixed(1)}%
+                            </Badge>
+                          </td>
+                          <td className="text-right p-3">
+                            <Badge 
+                              variant={performanceScore >= 80 ? "default" : performanceScore >= 60 ? "secondary" : "destructive"}
+                              className="font-mono"
+                            >
+                              {performanceScore}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td className="p-3">Team Total</td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                              {memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.sales, 0)}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0))}
+                      </td>
+                      <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.commission, 0))}
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                        {formatCurrency(
                               memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0) / 
                               Math.max(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.sales, 0), 1)
-                            )}
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              {(
+                        )}
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                          {(
                                 memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.commission, 0) / 
                                 Math.max(memoizedReportData.agentPerformance.reduce((sum, agent) => sum + agent.premium, 0), 1) * 100
-                              ).toFixed(1)}%
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              {Math.round(
-                                memoizedReportData.agentPerformance.reduce((sum, agent) => {
-                                  const avgPremium = agent.sales > 0 ? agent.premium / agent.sales : 0;
-                                  const commissionRate = agent.premium > 0 ? (agent.commission / agent.premium * 100) : 0;
-                                  return sum + ((agent.sales * 0.4) + (avgPremium * 0.3) + (commissionRate * 0.3));
-                                }, 0) / Math.max(memoizedReportData.agentPerformance.length, 1)
-                              )}
-                            </Badge>
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Client Analytics Tab */}
-            <TabsContent value="clients" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Client Analytics</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Client Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span>Active Clients</span>
-                        <Badge variant="default">{memoizedReportData.clientAnalytics?.totalClients || 0}</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Prospects</span>
-                        <Badge variant="secondary">{memoizedReportData.clientAnalytics?.totalProspects || 0}</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Conversion Rate</span>
-                        <Badge variant="outline">
-                          {formatPercentage(memoizedReportData.clientAnalytics?.conversionRate || 0)}
+                          ).toFixed(1)}%
                         </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Client Acquisition</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-green-600">
-                        {memoizedReportData.salesSummary?.totalSales || 0}
-                      </div>
-                      <p className="text-sm text-gray-600 mt-2">New clients acquired in selected period</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Average Deal Value</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-600">
-                        {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)}
-                      </div>
-                      <p className="text-sm text-gray-600 mt-2">Average premium per client</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                          {Math.round(
+                                memoizedReportData.agentPerformance.reduce((sum, agent) => {
+                              const avgPremium = agent.sales > 0 ? agent.premium / agent.sales : 0;
+                              const commissionRate = agent.premium > 0 ? (agent.commission / agent.premium * 100) : 0;
+                              return sum + ((agent.sales * 0.4) + (avgPremium * 0.3) + (commissionRate * 0.3));
+                                }, 0) / Math.max(memoizedReportData.agentPerformance.length, 1)
+                          )}
+                        </Badge>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {/* Client Analytics Detailed Data Table */}
-              <Card>
+        {/* Client Analytics Tab */}
+        <TabsContent value="clients" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Client Analytics</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span>Active Clients</span>
+                        <Badge variant="default">{memoizedReportData.clientAnalytics?.totalClients || 0}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Prospects</span>
+                        <Badge variant="secondary">{memoizedReportData.clientAnalytics?.totalProspects || 0}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Conversion Rate</span>
+                    <Badge variant="outline">
+                          {formatPercentage(memoizedReportData.clientAnalytics?.conversionRate || 0)}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Acquisition</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600">
+                        {memoizedReportData.salesSummary?.totalSales || 0}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">New clients acquired in selected period</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Average Deal Value</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">
+                        {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Average premium per client</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Client Analytics Detailed Data Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Analytics - Detailed Breakdown</CardTitle>
+              <CardDescription>Comprehensive client metrics and trends analysis</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Metric</th>
+                      <th className="text-right p-3 font-medium">Current Period</th>
+                      <th className="text-right p-3 font-medium">Previous Period</th>
+                      <th className="text-right p-3 font-medium">Change</th>
+                      <th className="text-right p-3 font-medium">Trend</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3 font-medium">Total Clients</td>
+                      <td className="text-right p-3">
+                        <Badge variant="default" className="font-mono">
+                              {memoizedReportData.clientAnalytics?.totalClients || 0}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                            {Math.max((memoizedReportData.clientAnalytics?.totalClients || 0) - (memoizedReportData.salesSummary?.totalSales || 0), 0)}
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default" className="font-mono">
+                              +{memoizedReportData.salesSummary?.totalSales || 0}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">↗ Growing</Badge>
+                      </td>
+                    </tr>
+                    <tr className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3 font-medium">Active Prospects</td>
+                      <td className="text-right p-3">
+                        <Badge variant="secondary" className="font-mono">
+                              {memoizedReportData.clientAnalytics?.totalProspects || 0}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                            {Math.round((memoizedReportData.clientAnalytics?.totalProspects || 0) * 1.1)}
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="secondary" className="font-mono">
+                              -{Math.round((memoizedReportData.clientAnalytics?.totalProspects || 0) * 0.1)}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="secondary">↘ Declining</Badge>
+                      </td>
+                    </tr>
+                    <tr className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3 font-medium">Conversion Rate</td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                              {formatPercentage(memoizedReportData.clientAnalytics?.conversionRate || 0)}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                            {formatPercentage(Math.max((memoizedReportData.clientAnalytics?.conversionRate || 0) - 2, 0))}
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default" className="font-mono">
+                          +2.0%
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">↗ Improving</Badge>
+                      </td>
+                    </tr>
+                    <tr className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3 font-medium">Avg Deal Size</td>
+                      <td className="text-right p-3 font-mono">
+                            {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)}
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                            {formatCurrency(Math.max((memoizedReportData.salesSummary?.averageDealSize || 0) * 0.95, 0))}
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default" className="font-mono">
+                              +{formatCurrency((memoizedReportData.salesSummary?.averageDealSize || 0) * 0.05)}
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">↗ Increasing</Badge>
+                      </td>
+                    </tr>
+                    <tr className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3 font-medium">Client Retention</td>
+                      <td className="text-right p-3">
+                        <Badge variant="outline" className="font-mono">
+                          94.2%
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                        92.8%
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default" className="font-mono">
+                          +1.4%
+                        </Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">↗ Stable</Badge>
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td className="p-3">Overall Performance</td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">Excellent</Badge>
+                      </td>
+                      <td className="text-right p-3 font-mono text-muted-foreground">
+                        Good
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">+15.2%</Badge>
+                      </td>
+                      <td className="text-right p-3">
+                        <Badge variant="default">↗ Strong Growth</Badge>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Goal Tracking Tab */}
+        <TabsContent value="goals" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Goal Tracking</h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+                {memoizedReportData.goalProgress.map((goal, index) => (
+              <Card key={index}>
                 <CardHeader>
-                  <CardTitle>Client Analytics - Detailed Breakdown</CardTitle>
-                  <CardDescription>Comprehensive client metrics and trends analysis</CardDescription>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>{goal.title}</CardTitle>
+                    <Badge variant={goal.status === 'Active' ? 'default' : 'secondary'}>
+                      {goal.status}
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left p-3 font-medium">Metric</th>
-                          <th className="text-right p-3 font-medium">Current Period</th>
-                          <th className="text-right p-3 font-medium">Previous Period</th>
-                          <th className="text-right p-3 font-medium">Change</th>
-                          <th className="text-right p-3 font-medium">Trend</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-medium">Total Clients</td>
-                          <td className="text-right p-3">
-                            <Badge variant="default" className="font-mono">
-                              {memoizedReportData.clientAnalytics?.totalClients || 0}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            {Math.max((memoizedReportData.clientAnalytics?.totalClients || 0) - (memoizedReportData.salesSummary?.totalSales || 0), 0)}
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default" className="font-mono">
-                              +{memoizedReportData.salesSummary?.totalSales || 0}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">↗ Growing</Badge>
-                          </td>
-                        </tr>
-                        <tr className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-medium">Active Prospects</td>
-                          <td className="text-right p-3">
-                            <Badge variant="secondary" className="font-mono">
-                              {memoizedReportData.clientAnalytics?.totalProspects || 0}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            {Math.round((memoizedReportData.clientAnalytics?.totalProspects || 0) * 1.1)}
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="secondary" className="font-mono">
-                              -{Math.round((memoizedReportData.clientAnalytics?.totalProspects || 0) * 0.1)}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="secondary">↘ Declining</Badge>
-                          </td>
-                        </tr>
-                        <tr className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-medium">Conversion Rate</td>
-                          <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              {formatPercentage(memoizedReportData.clientAnalytics?.conversionRate || 0)}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            {formatPercentage(Math.max((memoizedReportData.clientAnalytics?.conversionRate || 0) - 2, 0))}
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default" className="font-mono">
-                              +2.0%
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">↗ Improving</Badge>
-                          </td>
-                        </tr>
-                        <tr className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-medium">Avg Deal Size</td>
-                          <td className="text-right p-3 font-mono">
-                            {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)}
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            {formatCurrency(Math.max((memoizedReportData.salesSummary?.averageDealSize || 0) * 0.95, 0))}
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default" className="font-mono">
-                              +{formatCurrency((memoizedReportData.salesSummary?.averageDealSize || 0) * 0.05)}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">↗ Increasing</Badge>
-                          </td>
-                        </tr>
-                        <tr className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-medium">Client Retention</td>
-                          <td className="text-right p-3">
-                            <Badge variant="outline" className="font-mono">
-                              94.2%
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            92.8%
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default" className="font-mono">
-                              +1.4%
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">↗ Stable</Badge>
-                          </td>
-                        </tr>
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td className="p-3">Overall Performance</td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">Excellent</Badge>
-                          </td>
-                          <td className="text-right p-3 font-mono text-muted-foreground">
-                            Good
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">+15.2%</Badge>
-                          </td>
-                          <td className="text-right p-3">
-                            <Badge variant="default">↗ Strong Growth</Badge>
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{formatPercentage(goal.progress)}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Current: {formatCurrency(goal.current)}</span>
+                      <span>Target: {formatCurrency(goal.target)}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            {/* Goal Tracking Tab */}
-            <TabsContent value="goals" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Goal Tracking</h2>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6">
-                {memoizedReportData.goalProgress.map((goal, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <CardTitle>{goal.title}</CardTitle>
-                        <Badge variant={goal.status === 'Active' ? 'default' : 'secondary'}>
-                          {goal.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{formatPercentage(goal.progress)}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(goal.progress, 100)}%` }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <span>Current: {formatCurrency(goal.current)}</span>
-                          <span>Target: {formatCurrency(goal.target)}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-          </Tabs>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
         </>
       )}
     </div>

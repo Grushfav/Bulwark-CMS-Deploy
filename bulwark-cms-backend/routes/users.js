@@ -6,6 +6,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { requireManager } from '../middleware/roleCheck.js';
 import { eq, and, like, desc, asc, or } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { sql } from 'drizzle-orm';
 
 const router = express.Router();
 
@@ -45,6 +46,9 @@ router.get('/', authenticateToken, requireManager, [
 
     // Build where conditions
     let whereConditions = [];
+
+    // Always exclude deleted users
+    whereConditions.push(sql`${users.deletedAt} IS NULL`);
 
     if (role) {
       whereConditions.push(eq(users.role, role));
@@ -301,13 +305,19 @@ router.delete('/:id', authenticateToken, requireManager, async (req, res) => {
 
     // Prevent deleting the last manager
     if (existingUser[0].role === 'manager') {
-      const managerCount = await db.select({ count: users.id })
+      // Count only active managers
+      const managerCountResult = await db.select({ count: sql`count(*)` })
         .from(users)
-        .where(eq(users.role, 'manager'));
+        .where(and(
+          eq(users.role, 'manager'),
+          eq(users.isActive, true)
+        ));
 
-      if (managerCount[0]?.count <= 1) {
+      const activeManagerCount = parseInt(managerCountResult[0]?.count || 0);
+      
+      if (activeManagerCount <= 1) {
         return res.status(400).json({
-          error: 'Cannot delete the last manager',
+          error: 'Cannot delete the last active manager',
           code: 'LAST_MANAGER'
         });
       }
@@ -1104,7 +1114,7 @@ router.put('/profile', authenticateToken, [
 
 // POST /:id/reset-password - Reset user password (managers only)
 router.post('/:id/reset-password', authenticateToken, requireManager, [
-  body('new_password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
+  body('new_password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
 ], async (req, res) => {
   try {
     // Check validation errors
@@ -1120,19 +1130,28 @@ router.post('/:id/reset-password', authenticateToken, requireManager, [
     const userId = parseInt(req.params.id);
     const { new_password } = req.body;
 
+    console.log('🔧 Password reset - User ID:', userId);
+    console.log('🔧 Password reset - New password length:', new_password.length);
+
     // Check if user exists
     const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     
     if (!user || user.length === 0) {
+      console.log('🔧 Password reset - User not found');
       return res.status(404).json({
         error: 'User not found',
         code: 'USER_NOT_FOUND'
       });
     }
 
+    console.log('🔧 Password reset - User found:', user[0].email);
+
     // Hash the new password
-    const saltRounds = 10;
+    const saltRounds = 12; // Standardized to match profile password change
     const hashedPassword = await bcrypt.hash(new_password, saltRounds);
+    
+    console.log('🔧 Password reset - Password hashed successfully');
+    console.log('🔧 Password reset - Hash length:', hashedPassword.length);
 
     // Update the user's password
     const updatedUser = await db.update(users)
@@ -1144,13 +1163,15 @@ router.post('/:id/reset-password', authenticateToken, requireManager, [
       .where(eq(users.id, userId))
       .returning();
 
+    console.log('🔧 Password reset - Database update successful');
+    console.log('🔧 Password reset - Updated user ID:', updatedUser[0].id);
+
     res.json({
       message: 'Password reset successfully',
       user: {
         id: updatedUser[0].id,
-        email: updatedUser[0].email,
-        firstName: updatedUser[0].firstName,
-        lastName: updatedUser[0].lastName
+        passwordUpdated: true,
+        updatedAt: updatedUser[0].updatedAt
       }
     });
 

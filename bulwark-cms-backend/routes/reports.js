@@ -283,6 +283,7 @@ router.get('/sales', authenticateToken, [
   }
 });
 
+
 // GET /performance - Generate performance reports
 router.get('/performance', authenticateToken, [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),

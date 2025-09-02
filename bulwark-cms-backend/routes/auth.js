@@ -83,7 +83,7 @@ router.post('/login', validateLogin, async (req, res) => {
       await db.update(users)
         .set({ 
           failedLoginAttempts: failedAttempts,
-          accountLockedUntil
+          accountLockedUntil: accountLockedUntil
         })
         .where(eq(users.id, userData.id));
       

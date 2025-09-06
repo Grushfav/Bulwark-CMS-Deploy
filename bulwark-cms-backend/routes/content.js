@@ -734,4 +734,90 @@ router.get('/content/:id/download', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /content/:id/preview - Preview content file (serve without download)
+router.get('/content/:id/preview', authenticateToken, async (req, res) => {
+  try {
+    const contentId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Get content with file information
+    const contentItem = await db.select({
+      id: content.id,
+      fileName: content.fileName,
+      filePath: content.filePath,
+      mimeType: content.mimeType,
+      fileSize: content.fileSize,
+      authorId: content.authorId,
+      isPublic: content.isPublic,
+      title: content.title,
+      description: content.description
+    })
+    .from(content)
+    .where(eq(content.id, contentId))
+    .limit(1);
+
+    if (!contentItem || contentItem.length === 0) {
+      return res.status(404).json({
+        error: 'Content not found',
+        code: 'CONTENT_NOT_FOUND'
+      });
+    }
+
+    const item = contentItem[0];
+
+    // Check access permissions (same as download)
+    if (!item.isPublic && item.authorId !== userId) {
+      return res.status(403).json({
+        error: 'Access denied - This content is private',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    if (!item.filePath) {
+      return res.status(404).json({
+        error: 'No file associated with this content',
+        code: 'NO_FILE'
+      });
+    }
+
+    // Check if file exists
+    const fullPath = path.join(process.cwd(), item.filePath);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({
+        error: 'File not found on server',
+        code: 'FILE_NOT_FOUND'
+      });
+    }
+
+    // Increment view count (not download count)
+    await db.update(content)
+      .set({ 
+        viewCount: (item.viewCount || 0) + 1,
+        updatedAt: new Date()
+      })
+      .where(eq(content.id, contentId));
+
+    // Set headers for preview (inline display, not download)
+    res.setHeader('Content-Type', item.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+    
+    // Add CORS headers for cross-origin previews
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Stream the file for preview
+    const fileStream = fs.createReadStream(fullPath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('Preview content error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
 export default router;

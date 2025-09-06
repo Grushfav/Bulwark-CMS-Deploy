@@ -1,3 +1,4 @@
+import multer from 'multer';
 import upload, { avatarUpload, contentUpload, bulkUpload } from '../config/multer.js';
 
 // File upload middleware wrapper

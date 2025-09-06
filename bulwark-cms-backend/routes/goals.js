@@ -305,7 +305,7 @@ router.get('/', authenticateToken, [
     let whereConditions = [];
 
     // Role-based filtering - Both managers and agents see only their own goals
-    whereConditions.push(eq(goals.agentId, userId));
+      whereConditions.push(eq(goals.agentId, userId));
     console.log(`👤 ${userRole === 'manager' ? 'Manager' : 'Agent'} access: viewing own goals only`);
     
     // Note: Removed agent_id filtering since managers now only see their own goals
@@ -773,7 +773,7 @@ router.post('/', authenticateToken, validateGoal, async (req, res) => {
     console.log('🔍 Formatted goal ID:', formattedGoal.id);
 
     console.log(`✅ Goal created successfully:`, formattedGoal);
-    
+
     res.status(201).json({
       success: true,
       message: 'Goal created successfully',
@@ -932,7 +932,7 @@ router.put('/:id', authenticateToken, validateGoal, async (req, res) => {
     clearGoalCacheOnUpdate(goalId);
     
     console.log(`✅ Goal updated successfully:`, formattedGoal);
-    
+
     res.json({
       success: true,
       message: 'Goal updated successfully',
@@ -987,7 +987,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     clearGoalCacheOnUpdate(goalId);
 
     console.log(`✅ Goal deleted successfully`);
-    
+
     res.json({
       success: true,
       message: 'Goal deleted successfully'
@@ -1077,7 +1077,7 @@ router.put('/:id/progress', authenticateToken, [
     const formattedGoal = formatGoalForFrontend(updatedGoal[0]);
     
     console.log(`✅ Goal progress updated successfully:`, formattedGoal);
-    
+
     res.json({
       success: true,
       message: 'Goal progress updated successfully',

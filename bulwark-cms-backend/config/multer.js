@@ -2,8 +2,23 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
+
+// Ensure upload directories exist
+const ensureUploadDirs = () => {
+  const dirs = ['./uploads/temp/', './uploads/avatars/', './uploads/content/'];
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Created upload directory: ${dir}`);
+    }
+  });
+};
+
+// Initialize upload directories
+ensureUploadDirs();
 
 // Configure storage
 const storage = multer.diskStorage({

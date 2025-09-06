@@ -614,13 +614,43 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
           return;
         }
 
+        // Validate email format if provided
+        if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+          errors.push({
+            row: results.length + 1,
+            error: 'Invalid email format'
+          });
+          return;
+        }
+
+        // Validate status if provided
+        if (data.status && !['client', 'prospect'].includes(data.status.toLowerCase())) {
+          errors.push({
+            row: results.length + 1,
+            error: 'Status must be either "client" or "prospect"'
+          });
+          return;
+        }
+
+        // Parse date of birth if provided
+        let dateOfBirth = null;
+        if (data.dateOfBirth || data.date_of_birth) {
+          const dateStr = data.dateOfBirth || data.date_of_birth;
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            dateOfBirth = parsedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+          }
+        }
+
         results.push({
           firstName: data.firstName.trim(),
           lastName: data.lastName.trim(),
           email: data.email ? data.email.trim() : null,
           phone: data.phone ? data.phone.trim() : null,
+          dateOfBirth: dateOfBirth,
           employer: data.employer ? data.employer.trim() : null,
-          status: data.status === 'client' ? 'client' : 'prospect'
+          status: data.status && data.status.toLowerCase() === 'client' ? 'client' : 'prospect',
+          notes: data.notes ? data.notes.trim() : null
         });
       })
       .on('end', async () => {
@@ -656,7 +686,7 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
 
           res.json({
             message: 'Bulk import completed successfully',
-            imported: insertedClients.length,
+            imported_count: insertedClients.length,
             totalRows: results.length
           });
 

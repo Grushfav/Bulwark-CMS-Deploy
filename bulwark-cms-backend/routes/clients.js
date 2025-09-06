@@ -590,7 +590,19 @@ router.get('/:id/notes', authenticateToken, async (req, res) => {
 // POST /clients/bulk-import - Bulk import clients from CSV
 router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
   try {
+    console.log('📁 CSV Import - Request received:', {
+      hasFile: !!req.file,
+      fileInfo: req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      } : null,
+      user: req.user
+    });
+
     if (!req.file) {
+      console.log('❌ CSV Import - No file provided');
       return res.status(400).json({
         error: 'CSV file is required',
         code: 'FILE_REQUIRED'
@@ -601,10 +613,13 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
     const results = [];
     const errors = [];
 
+    console.log('📁 CSV Import - Starting file parsing:', filePath);
+    
     // Parse CSV file
     fs.createReadStream(filePath)
       .pipe(csv())
       .on('data', (data) => {
+        console.log('📁 CSV Import - Parsing row:', data);
         // Validate required fields
         if (!data.firstName || !data.lastName) {
           errors.push({
@@ -699,25 +714,30 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
         }
       })
       .on('error', (error) => {
+        console.error('📁 CSV Import - Parsing error:', error);
+        
         // Clean up file
         try {
           fs.unlinkSync(filePath);
+          console.log('📁 CSV Import - File cleaned up after error');
         } catch (unlinkError) {
-          console.error('Error deleting file:', unlinkError);
+          console.error('📁 CSV Import - Error deleting file:', unlinkError);
         }
 
-        console.error('CSV parsing error:', error);
         res.status(400).json({
           error: 'Invalid CSV file',
-          code: 'INVALID_CSV'
+          code: 'INVALID_CSV',
+          details: error.message
         });
       });
 
   } catch (error) {
-    console.error('Bulk import error:', error);
+    console.error('📁 CSV Import - Main error:', error);
+    console.error('📁 CSV Import - Error stack:', error.stack);
     res.status(500).json({
       error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
+      code: 'INTERNAL_ERROR',
+      details: error.message
     });
   }
 });

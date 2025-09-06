@@ -194,7 +194,14 @@ const ContentManagement = () => {
 
     try {
       setPreviewLoading(true);
+      console.log('🔍 Starting preview for:', { contentId, fileName, mimeType });
+      
       const response = await contentAPI.previewFile(contentId);
+      console.log('🔍 Preview API response:', { 
+        status: response.status, 
+        headers: response.headers,
+        dataSize: response.data?.size || response.data?.length 
+      });
       
       // Create blob URL for preview
       const blob = new Blob([response.data], { 
@@ -202,15 +209,24 @@ const ContentManagement = () => {
       });
       const url = window.URL.createObjectURL(blob);
       
-      setPreviewContent({
+      console.log('🔍 Created blob URL:', url);
+      console.log('🔍 Blob details:', { 
+        size: blob.size, 
+        type: blob.type 
+      });
+      
+      const previewData = {
         id: contentId,
         fileName,
         mimeType: response.headers['content-type'] || mimeType,
         url
-      });
+      };
+      
+      console.log('🔍 Setting preview content:', previewData);
+      setPreviewContent(previewData);
       
     } catch (error) {
-      console.error('Preview error:', error);
+      console.error('❌ Preview error:', error);
       if (error.response?.status === 404) {
         toast.error('Document not found or has been removed');
       } else if (error.response?.status === 403) {
@@ -226,7 +242,9 @@ const ContentManagement = () => {
   };
 
   const closePreview = () => {
+    console.log('🔍 Closing preview, current content:', previewContent);
     if (previewContent?.url) {
+      console.log('🔍 Revoking blob URL:', previewContent.url);
       window.URL.revokeObjectURL(previewContent.url);
     }
     setPreviewContent(null);
@@ -1005,8 +1023,12 @@ const EditDocumentDialog = ({ content, onClose, onUpdate }) => {
 const PreviewModal = ({ content, onClose }) => {
   if (!content) return null;
 
+  console.log('🔍 PreviewModal rendering with content:', content);
+
   const renderPreview = () => {
     const { mimeType, url, fileName } = content;
+    
+    console.log('🔍 Rendering preview for:', { mimeType, url, fileName });
     
     // PDF files
     if (mimeType === 'application/pdf' || fileName?.toLowerCase().endsWith('.pdf')) {
@@ -1015,6 +1037,8 @@ const PreviewModal = ({ content, onClose }) => {
           src={url}
           className="w-full h-[80vh] border rounded"
           title={`Preview of ${fileName}`}
+          onLoad={() => console.log('🔍 PDF iframe loaded successfully')}
+          onError={(e) => console.error('❌ PDF iframe failed to load:', e)}
         />
       );
     }
@@ -1027,6 +1051,8 @@ const PreviewModal = ({ content, onClose }) => {
             src={url}
             alt={`Preview of ${fileName}`}
             className="max-w-full max-h-[80vh] object-contain border rounded"
+            onLoad={() => console.log('🔍 Image loaded successfully')}
+            onError={(e) => console.error('❌ Image failed to load:', e)}
           />
         </div>
       );

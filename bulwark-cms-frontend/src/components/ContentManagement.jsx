@@ -502,9 +502,11 @@ const ContentManagement = () => {
              content={content}
              onUpdateContent={updateContent}
              onDeleteContent={deleteContent}
-             user={user}
+             onPreviewDocument={handlePreviewDocument}
+             onDownloadDocument={handleDownloadDocument}
+             previewLoading={previewLoading}
              downloadingContentId={downloadingContentId}
-             handleDownloadDocument={handleDownloadDocument}
+             user={user}
              getContentTypeIcon={getContentTypeIcon}
              getContentTypeLabel={getContentTypeLabel}
              getVisibilityIcon={getVisibilityIcon}
@@ -529,10 +531,12 @@ const ContentManagement = () => {
 const ContentList = ({ 
   content, 
   onUpdateContent, 
-  onDeleteContent, 
-  user,
+  onDeleteContent,
+  onPreviewDocument,
+  onDownloadDocument,
+  previewLoading,
   downloadingContentId,
-  handleDownloadDocument,
+  user,
   getContentTypeIcon,
   getContentTypeLabel,
   getVisibilityIcon,
@@ -646,7 +650,7 @@ const ContentList = ({
                      variant="outline"
                      size="sm"
                      className="flex-1"
-                     onClick={() => handlePreviewDocument(item.id, item.fileName || item.file_name, item.mimeType || item.mime_type)}
+                     onClick={() => onPreviewDocument(item.id, item.fileName || item.file_name, item.mimeType || item.mime_type)}
                      disabled={previewLoading}
                    >
                      {previewLoading ? (
@@ -665,7 +669,7 @@ const ContentList = ({
                      variant="outline"
                      size="sm"
                      className="flex-1"
-                     onClick={() => handleDownloadDocument(item.id, item.fileName || item.file_name)}
+                     onClick={() => onDownloadDocument(item.id, item.fileName || item.file_name)}
                      disabled={downloadingContentId === item.id}
                    >
                      {downloadingContentId === item.id ? (

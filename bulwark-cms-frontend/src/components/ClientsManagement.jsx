@@ -477,7 +477,7 @@ const ClientsManagement = () => {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Date of Birth', 'Employer', 'Status', 'Notes'];
+    const headers = ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status', 'notes'];
     const sampleData = [
       'John',
       'Doe',

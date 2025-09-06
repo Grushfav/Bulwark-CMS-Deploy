@@ -624,6 +624,12 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
       .on('data', (data) => {
         console.log('📁 CSV Import - Parsing row:', data);
         
+        // Skip empty rows
+        if (!data || Object.keys(data).length === 0) {
+          console.log('📁 CSV Import - Skipping empty row');
+          return;
+        }
+        
         // Skip header row if it's being processed as data
         if (data.firstName === 'firstName' && data.lastName === 'lastName') {
           console.log('📁 CSV Import - Skipping header row');
@@ -667,7 +673,7 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
           }
         }
 
-        results.push({
+        const processedRow = {
           firstName: data.firstName.trim(),
           lastName: data.lastName.trim(),
           email: data.email ? data.email.trim() : null,
@@ -676,12 +682,21 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
           employer: data.employer ? data.employer.trim() : null,
           status: data.status && data.status.toLowerCase() === 'client' ? 'client' : 'prospect',
           notes: data.notes ? data.notes.trim() : null
-        });
+        };
+        
+        console.log('📁 CSV Import - Processed row:', processedRow);
+        results.push(processedRow);
       })
       .on('end', async () => {
+        console.log('📁 CSV Import - End event triggered');
+        console.log('📁 CSV Import - Total errors:', errors.length);
+        console.log('📁 CSV Import - Total results:', results.length);
+        
         try {
           // Clean up file
+          console.log('📁 CSV Import - Cleaning up file:', filePath);
           fs.unlinkSync(filePath);
+          console.log('📁 CSV Import - File cleaned up successfully');
 
           if (errors.length > 0) {
             return res.status(400).json({
@@ -691,6 +706,9 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
               validRows: results.length
             });
           }
+
+          console.log('📁 CSV Import - Total results to insert:', results.length);
+          console.log('📁 CSV Import - Results:', results);
 
           // Insert clients in batches
           const batchSize = 100;
@@ -705,8 +723,16 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
               updatedAt: new Date()
             }));
 
-            const inserted = await db.insert(clients).values(batchData).returning();
-            insertedClients.push(...inserted);
+            console.log('📁 CSV Import - Batch data to insert:', batchData);
+            
+            try {
+              const inserted = await db.insert(clients).values(batchData).returning();
+              console.log('📁 CSV Import - Successfully inserted batch:', inserted);
+              insertedClients.push(...inserted);
+            } catch (insertError) {
+              console.error('📁 CSV Import - Database insert error:', insertError);
+              throw insertError;
+            }
           }
 
           res.json({

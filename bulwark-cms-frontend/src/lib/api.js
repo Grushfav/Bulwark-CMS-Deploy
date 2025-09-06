@@ -125,6 +125,7 @@ export const remindersAPI = {
   createReminder: (reminderData) => api.post('/reminders', reminderData),
   getReminder: (id) => api.get(`/reminders/${id}`),
   updateReminder: (id, reminderData) => api.put(`/reminders/${id}`, reminderData),
+  completeReminder: (id) => api.put(`/reminders/${id}/complete`),
   deleteReminder: (id) => api.delete(`/reminders/${id}`),
   getUpcomingReminders: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();

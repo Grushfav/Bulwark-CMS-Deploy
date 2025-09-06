@@ -1,15 +1,15 @@
 // Configuration file using environment variables
 export const config = {
-  // Use deployed backend for testing
-  apiUrl: 'https://bulwark-cms-deploy.onrender.com/api',
+  // Force localhost for development
+  apiUrl: 'http://localhost:5000/api',
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173',
-  environment: 'production'
+  environment: 'local'
 };
 
 // Helper function to get current API URL
 export const getApiUrl = () => {
-  // Use deployed backend for testing
-  return 'https://bulwark-cms-deploy.onrender.com/api';
+  // Always use localhost for development
+  return 'http://localhost:5000/api';
 };
 
 // Helper function to get current frontend URL

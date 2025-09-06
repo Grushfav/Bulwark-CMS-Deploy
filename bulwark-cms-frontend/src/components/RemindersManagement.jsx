@@ -310,7 +310,7 @@ const RemindersManagement = () => {
 
   const handleComplete = async (reminderId, isCompleted) => {
     try {
-      await remindersAPI.updateReminder(reminderId, { is_completed: !isCompleted });
+      await remindersAPI.completeReminder(reminderId);
       fetchReminders();
       toast.success(isCompleted ? 'Reminder marked as pending' : 'Reminder marked as completed');
     } catch (error) {

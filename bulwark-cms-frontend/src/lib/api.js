@@ -190,6 +190,7 @@ export const contentAPI = {
     });
   },
   downloadFile: (id) => api.get(`/content-management/content/${id}/download`, { responseType: 'blob' }),
+  previewFile: (id) => api.get(`/content-management/content/${id}/preview`, { responseType: 'blob' }),
   getCategories: () => api.get('/content-management/categories'),
   createCategory: (categoryData) => api.post('/content-management/categories', categoryData),
   getTags: () => api.get('/content-management/tags'),

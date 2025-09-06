@@ -62,6 +62,8 @@ const ContentManagement = () => {
   const [selectedContent, setSelectedContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloadingContentId, setDownloadingContentId] = useState(null);
+  const [previewContent, setPreviewContent] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     type: '',
@@ -182,6 +184,52 @@ const ContentManagement = () => {
     } finally {
       setDownloadingContentId(null);
     }
+  };
+
+  const handlePreviewDocument = async (contentId, fileName, mimeType) => {
+    if (!contentId || !fileName) {
+      toast.error('Invalid content information');
+      return;
+    }
+
+    try {
+      setPreviewLoading(true);
+      const response = await contentAPI.previewFile(contentId);
+      
+      // Create blob URL for preview
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || mimeType || 'application/octet-stream' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      
+      setPreviewContent({
+        id: contentId,
+        fileName,
+        mimeType: response.headers['content-type'] || mimeType,
+        url
+      });
+      
+    } catch (error) {
+      console.error('Preview error:', error);
+      if (error.response?.status === 404) {
+        toast.error('Document not found or has been removed');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. You do not have permission to preview this document.');
+      } else if (error.response?.status === 401) {
+        toast.error('Authentication required. Please log in again.');
+      } else {
+        toast.error(`Preview failed: ${error.response?.data?.error || error.message || 'Unknown error'}`);
+      }
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (previewContent?.url) {
+      window.URL.revokeObjectURL(previewContent.url);
+    }
+    setPreviewContent(null);
   };
 
   const createContent = async (contentData) => {
@@ -598,6 +646,25 @@ const ContentList = ({
                      variant="outline"
                      size="sm"
                      className="flex-1"
+                     onClick={() => handlePreviewDocument(item.id, item.fileName || item.file_name, item.mimeType || item.mime_type)}
+                     disabled={previewLoading}
+                   >
+                     {previewLoading ? (
+                       <>
+                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-1"></div>
+                         Loading...
+                       </>
+                     ) : (
+                       <>
+                         <Eye className="w-4 h-4 mr-1" />
+                         Preview
+                       </>
+                     )}
+                   </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     className="flex-1"
                      onClick={() => handleDownloadDocument(item.id, item.fileName || item.file_name)}
                      disabled={downloadingContentId === item.id}
                    >
@@ -634,6 +701,13 @@ const ContentList = ({
           content={editingContent}
           onClose={() => setEditingContent(null)}
           onUpdate={onUpdateContent}
+        />
+      )}
+      
+      {previewContent && (
+        <PreviewModal
+          content={previewContent}
+          onClose={closePreview}
         />
       )}
     </div>
@@ -918,6 +992,113 @@ const EditDocumentDialog = ({ content, onClose, onUpdate }) => {
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Preview Modal Component
+const PreviewModal = ({ content, onClose }) => {
+  if (!content) return null;
+
+  const renderPreview = () => {
+    const { mimeType, url, fileName } = content;
+    
+    // PDF files
+    if (mimeType === 'application/pdf' || fileName?.toLowerCase().endsWith('.pdf')) {
+      return (
+        <iframe
+          src={url}
+          className="w-full h-[80vh] border rounded"
+          title={`Preview of ${fileName}`}
+        />
+      );
+    }
+    
+    // Image files
+    if (mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName)) {
+      return (
+        <div className="flex justify-center">
+          <img
+            src={url}
+            alt={`Preview of ${fileName}`}
+            className="max-w-full max-h-[80vh] object-contain border rounded"
+          />
+        </div>
+      );
+    }
+    
+    // Text files
+    if (mimeType?.startsWith('text/') || /\.(txt|md|json|xml|csv)$/i.test(fileName)) {
+      return (
+        <div className="w-full h-[80vh] overflow-auto">
+          <iframe
+            src={url}
+            className="w-full h-full border rounded"
+            title={`Preview of ${fileName}`}
+          />
+        </div>
+      );
+    }
+    
+    // Default: show download link
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <FileText className="w-16 h-16 text-muted-foreground" />
+        <div className="text-center">
+          <h3 className="text-lg font-medium">Preview not available</h3>
+          <p className="text-muted-foreground">
+            This file type cannot be previewed in the browser.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            File: {fileName}
+          </p>
+        </div>
+        <a
+          href={url}
+          download={fileName}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        >
+          Download File
+        </a>
+      </div>
+    );
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh]" aria-describedby="preview-dialog-description">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="w-5 h-5" />
+            Preview: {content.fileName}
+          </DialogTitle>
+        </DialogHeader>
+        <div id="preview-dialog-description" className="sr-only">
+          Preview modal showing the content of {content.fileName}
+        </div>
+        
+        <div className="overflow-auto">
+          {renderPreview()}
+        </div>
+        
+        <div className="flex justify-between items-center pt-4 border-t">
+          <div className="text-sm text-muted-foreground">
+            File type: {content.mimeType || 'Unknown'}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+            <a
+              href={content.url}
+              download={content.fileName}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm"
+            >
+              Download
+            </a>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

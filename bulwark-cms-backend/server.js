@@ -37,8 +37,8 @@ server.use(helmet({
 
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGIN 
-  //? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  //: ['http://localhost:5173'];
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
 
 console.log('🔧 CORS Configuration:', {
   CORS_ORIGIN: process.env.CORS_ORIGIN,
@@ -52,12 +52,22 @@ server.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Define allowed origins including deployed frontends
+    const allowedOrigins = [
+      ...corsOrigins,
+      'https://bulwark-cms-deploy-1.onrender.com',
+      'https://bulwark-cms-deploy.onrender.com',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    ];
+    
     // Check if origin is in allowed list
-    if (corsOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
     console.log('🚫 CORS blocked origin:', origin);
+    console.log('🔧 Allowed origins:', allowedOrigins);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,

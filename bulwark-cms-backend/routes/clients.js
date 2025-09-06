@@ -617,9 +617,19 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
     
     // Parse CSV file
     fs.createReadStream(filePath)
-      .pipe(csv())
+      .pipe(csv({
+        headers: ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status', 'notes'],
+        skipEmptyLines: true
+      }))
       .on('data', (data) => {
         console.log('📁 CSV Import - Parsing row:', data);
+        
+        // Skip header row if it's being processed as data
+        if (data.firstName === 'firstName' && data.lastName === 'lastName') {
+          console.log('📁 CSV Import - Skipping header row');
+          return;
+        }
+        
         // Validate required fields
         if (!data.firstName || !data.lastName) {
           errors.push({

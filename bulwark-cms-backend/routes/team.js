@@ -686,7 +686,7 @@ router.get('/top-agents', authenticateToken, async (req, res) => {
       monthlySalesAmount: sum(sales.premiumAmount)
     })
     .from(users)
-    .leftJoin(sales, and(
+    .innerJoin(sales, and(
       eq(users.id, sales.agentId),
       gte(sales.saleDate, monthStart.toISOString())
     ))

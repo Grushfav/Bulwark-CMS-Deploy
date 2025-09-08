@@ -42,8 +42,11 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from 'lucide-react';
+import ActivityLogTab from './ActivityLogTab.jsx';
+import ActivityLogViewer from './ActivityLogViewer.jsx';
 
 const UserProfile = () => {
   const { user, updateUser } = useAuth();
@@ -53,6 +56,7 @@ const UserProfile = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [showActivityLogViewer, setShowActivityLogViewer] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -407,7 +411,7 @@ const UserProfile = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className={`grid w-full gap-2 ${
              user?.role === 'manager' 
-               ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' 
+               ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' 
                : 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'
            }`}>
             <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -416,6 +420,9 @@ const UserProfile = () => {
               <TabsTrigger value="users">Users</TabsTrigger>
             )}
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            {user?.role === 'manager' && (
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            )}
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -456,11 +463,32 @@ const UserProfile = () => {
             />
           </TabsContent>
 
+          {user?.role === 'manager' && (
+            <TabsContent value="activity" className="space-y-4">
+              <ActivityLogTab onViewAll={() => setShowActivityLogViewer(true)} />
+            </TabsContent>
+          )}
+
           <TabsContent value="security" className="space-y-4">
             <SecurityTab onChangePassword={changePassword} />
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Activity Log Viewer Dialog */}
+      <Dialog open={showActivityLogViewer} onOpenChange={setShowActivityLogViewer}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Activity Logs
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[80vh]">
+            <ActivityLogViewer />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

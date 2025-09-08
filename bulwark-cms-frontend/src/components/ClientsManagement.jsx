@@ -26,7 +26,8 @@ import {
   DollarSign,
   MessageSquare,
   Users,
-  UserCheck
+  UserCheck,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth.jsx';
 import { toast } from 'sonner';
@@ -131,9 +132,10 @@ const ClientForm = ({ client, onSave, onCancel }) => {
   );
 };
 
-const ClientNotes = ({ client, onAddNote }) => {
+const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
   const [newNote, setNewNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null);
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -147,6 +149,29 @@ const ClientNotes = ({ client, onAddNote }) => {
       console.error('Error adding note:', error);
       toast.error('Failed to add note');
     }
+  };
+
+  const handleDeleteNote = (noteIndex) => {
+    setDeleteConfirmIndex(noteIndex);
+  };
+
+  const confirmDeleteNote = async () => {
+    if (deleteConfirmIndex === null) return;
+
+    try {
+      const note = client.notes[deleteConfirmIndex];
+      await onDeleteNote(client.id, note.id);
+      toast.success('Note deleted successfully');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Failed to delete note');
+    } finally {
+      setDeleteConfirmIndex(null);
+    }
+  };
+
+  const cancelDeleteNote = () => {
+    setDeleteConfirmIndex(null);
   };
 
   return (
@@ -193,16 +218,27 @@ const ClientNotes = ({ client, onAddNote }) => {
       <div className="space-y-2">
         {client.notes && client.notes.length > 0 ? (
           client.notes.map((note, index) => (
-            <div key={index} className="p-3 bg-gray-50 rounded-lg">
+            <div key={index} className="relative p-3 bg-gray-50 rounded-lg border group hover:border-red-200 hover:shadow-sm transition-all duration-200">
               <div className="flex items-start justify-between">
-                <p className="text-sm text-gray-700 flex-1">{note.note}</p>
-                <span className="text-xs text-gray-500 ml-2">
-                  {new Date(note.createdAt).toLocaleString()}
-                </span>
+                <div className="flex-1 pr-8">
+                  <p className="text-sm text-gray-700 mb-1">{note.note}</p>
+                  <div className="text-xs text-gray-500">
+                    {new Date(note.createdAt).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Added by: {note.agent?.firstName} {note.agent?.lastName}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-gray-400 mt-1">
-                Added by: {note.agent?.firstName} {note.agent?.lastName}
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteNote(index)}
+                className="absolute top-2 right-2 opacity-70 hover:opacity-100 transition-all duration-200 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                title="Delete note"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           ))
         ) : (
@@ -211,11 +247,38 @@ const ClientNotes = ({ client, onAddNote }) => {
           </p>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmIndex !== null} onOpenChange={cancelDeleteNote}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Delete Note
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteNote}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteNote}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote }) => {
+const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote, onDeleteNote }) => {
   if (!client) return null;
 
   return (
@@ -227,7 +290,7 @@ const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote }) => {
             View and add notes for this client. Notes are timestamped and show who added them.
           </DialogDescription>
         </DialogHeader>
-        <ClientNotes client={client} onAddNote={onAddNote} />
+        <ClientNotes client={client} onAddNote={onAddNote} onDeleteNote={onDeleteNote} />
       </DialogContent>
     </Dialog>
   );
@@ -439,6 +502,34 @@ const ClientsManagement = () => {
     } catch (error) {
       console.error('Error adding note:', error);
       // Error is already handled in saveClientNote
+    }
+  };
+
+  const handleDeleteNote = async (clientId, noteId) => {
+    try {
+      // Delete note from database via API
+      await clientsAPI.deleteClientNote(clientId, noteId);
+
+      // Update the client's notes in state
+      const updatedClients = clients.map(client => {
+        if (client.id === clientId) {
+          return {
+            ...client,
+            notes: client.notes.filter(note => note.id !== noteId)
+          };
+        }
+        return client;
+      });
+      setClients(updatedClients);
+
+      // Update selectedClient to reflect the deleted note immediately
+      if (selectedClient && selectedClient.id === clientId) {
+        setSelectedClient(updatedClients.find(c => c.id === clientId));
+      }
+
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      throw error; // Re-throw to let the component handle the error display
     }
   };
 
@@ -1029,6 +1120,7 @@ const ClientsManagement = () => {
         isOpen={isNotesDialogOpen}
         onOpenChange={setIsNotesDialogOpen}
         onAddNote={handleAddNote}
+        onDeleteNote={handleDeleteNote}
       />
     </div>
   );

@@ -38,6 +38,7 @@ import {
   remindersAPI,
   teamAPI
 } from '@/lib/api';
+import AgentLeaderboard from './AgentLeaderboard.jsx';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
@@ -62,7 +63,6 @@ const CleanDashboard = () => {
     topPerformerSales: 0,
     teamTotalSales: 0,
     teamActivePolicies: 0,
-    topAgents: [] // New field for top 5 agents
   });
 
   const fetchDashboardData = useCallback(async () => {
@@ -154,8 +154,7 @@ const CleanDashboard = () => {
         totalAgents: 0,
         topPerformerSales: 0,
         teamTotalSales: 0,
-        teamActivePolicies: 0,
-        topAgents: []
+        teamActivePolicies: 0
       };
 
       if (shouldFetchOverall) {
@@ -169,22 +168,11 @@ const CleanDashboard = () => {
             const agents = teamData.agents || [];
             console.log('🔍 Top agents data received:', { agentCount: agents.length });
             
-            // Use the data from the new top-agents endpoint
-            const top5Agents = agents.map(agent => ({
-              id: agent.id,
-              firstName: agent.firstName,
-              lastName: agent.lastName,
-              email: agent.email,
-              totalSales: agent.salesCount || 0,
-              totalPremium: agent.salesAmount || 0
-            }));
-            
             agentMetrics = {
               totalAgents: agents.length,
               topPerformerSales: Math.max(...agents.map(agent => agent.salesCount || 0), 0),
               teamTotalSales: agents.reduce((sum, agent) => sum + (agent.salesCount || 0), 0),
-              teamActivePolicies: agents.reduce((sum, agent) => sum + (agent.salesCount || 0), 0),
-              topAgents: top5Agents
+              teamActivePolicies: agents.reduce((sum, agent) => sum + (agent.salesCount || 0), 0)
             };
             
 
@@ -446,62 +434,7 @@ const CleanDashboard = () => {
       {/* Agent Performance Metrics */}
       {user?.role === 'manager' && viewMode === 'overall' && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Top 5 Agents This Month</h2>
-          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base text-gray-900 dark:text-white flex items-center space-x-2">
-                <span className="text-lg">🏆</span>
-                <span>Top 5 Agents by Monthly Performance</span>
-              </CardTitle>
-              <CardDescription className="text-sm text-gray-600 dark:text-gray-400">Highest performing agents this month</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {dashboardData.topAgents && dashboardData.topAgents.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboardData.topAgents.map((agent, index) => (
-                    <div key={agent.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                          index === 0 ? 'bg-yellow-500' :
-                          index === 1 ? 'bg-gray-400' :
-                          index === 2 ? 'bg-amber-600' :
-                          'bg-blue-500'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm text-gray-900 dark:text-white">
-                            {agent.firstName} {agent.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {agent.email}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-green-600 dark:text-green-400">
-                          {agent.totalSales || 0}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          Sales Count
-                        </div>
-                        <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                          ${(agent.totalPremium || 0).toLocaleString()}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          Total Sales
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                  <p className="text-sm">No agent data available for this month</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <AgentLeaderboard title="Top 5 Agents This Month" maxAgents={5} />
         </div>
       )}
 

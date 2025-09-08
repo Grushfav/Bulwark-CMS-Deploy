@@ -92,7 +92,10 @@ export const clients = pgTable('clients', {
 }, (table) => ({
   agentIdx: index('client_agent_idx').on(table.agentId),
   statusIdx: index('client_status_idx').on(table.status),
-  emailIdx: index('client_email_idx').on(table.email)
+  emailIdx: index('client_email_idx').on(table.email),
+  // Performance indexes for goal progress calculation
+  agentCreatedIdx: index('client_agent_created_composite').on(table.agentId, table.createdAt),
+  agentStatusCreatedIdx: index('client_agent_status_created').on(table.agentId, table.status, table.createdAt)
 }));
 
 // Products table
@@ -127,7 +130,10 @@ export const sales = pgTable('sales', {
   clientIdx: index('sale_client_idx').on(table.clientId),
   productIdx: index('sale_product_idx').on(table.productId),
   dateIdx: index('sale_date_idx').on(table.saleDate),
-  statusIdx: index('sale_status_idx').on(table.status)
+  statusIdx: index('sale_status_idx').on(table.status),
+  // Performance indexes for goal progress calculation
+  agentDateIdx: index('sale_agent_date_composite').on(table.agentId, table.saleDate),
+  agentStatusDateIdx: index('sale_agent_status_date').on(table.agentId, table.status, table.saleDate)
 }));
 
 // Goals table
@@ -148,7 +154,12 @@ export const goals = pgTable('goals', {
 }, (table) => ({
   agentIdx: index('goal_agent_idx').on(table.agentId),
   typeIdx: index('goal_type_idx').on(table.goalType),
-  activeIdx: index('goal_active_idx').on(table.isActive)
+  activeIdx: index('goal_active_idx').on(table.isActive),
+  // Performance indexes for goal filtering and queries
+  agentActiveIdx: index('goal_agent_active_composite').on(table.agentId, table.isActive),
+  agentTypeActiveIdx: index('goal_agent_type_active').on(table.agentId, table.goalType, table.isActive),
+  agentMetricActiveIdx: index('goal_agent_metric_active').on(table.agentId, table.metricType, table.isActive),
+  dateRangeIdx: index('goal_date_range').on(table.startDate, table.endDate)
 }));
 
 // Reminders table
@@ -328,4 +339,28 @@ export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
 export const clientNotesRelations = relations(clientNotes, ({ one }) => ({
   client: one(clients, { fields: [clientNotes.clientId], references: [clients.id] }),
   agent: one(users, { fields: [clientNotes.agentId], references: [users.id] })
+}));
+
+// Activity Logs Table
+export const activityLogs = pgTable('activity_logs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  entityType: text('entity_type').notNull(), // 'client', 'sale', 'reminder', 'goal'
+  entityId: integer('entity_id').notNull(), // ID of the affected entity
+  action: text('action').notNull(), // 'created', 'updated', 'deleted', 'imported', 'exported'
+  details: json('details'), // Additional details about the action
+  oldValues: json('old_values'), // Previous values (for updates)
+  newValues: json('new_values'), // New values (for updates/creates)
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => ({
+  userIdx: index('activity_user_idx').on(table.userId),
+  entityIdx: index('activity_entity_idx').on(table.entityType, table.entityId),
+  actionIdx: index('activity_action_idx').on(table.action),
+  createdAtIdx: index('activity_created_at_idx').on(table.createdAt)
+}));
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  user: one(users, { fields: [activityLogs.userId], references: [users.id] })
 }));

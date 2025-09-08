@@ -4,43 +4,122 @@ import { db } from '../config/database.js';
 import { goals, users, sales, clients } from '../models/schema.js';
 import { eq, and, or, desc, asc, gte, lte, between, sum, count } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth.js';
+import { registerCacheInvalidation } from '../utils/cacheInvalidation.js';
+import jobQueue from '../utils/jobQueue.js';
 
 const router = express.Router();
 
-// Basic in-memory cache for goals (simple but effective)
+// Enhanced in-memory cache for goals with smart invalidation
 const goalCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+const CACHE_MAX_SIZE = 1000; // Maximum cache entries to prevent memory leaks
+
+// Cache metadata for smart invalidation
+const cacheMetadata = new Map();
 
 // Helper function to get cached goal data
 const getCachedGoal = (goalId) => {
   const cached = goalCache.get(goalId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`✅ Cache hit for goal ${goalId}`);
     return cached.data;
   }
+  
+  if (cached) {
+    console.log(`⏰ Cache expired for goal ${goalId}`);
+    goalCache.delete(goalId);
+    cacheMetadata.delete(goalId);
+  }
+  
   return null;
 };
 
-// Helper function to set cached goal data
+// Helper function to set cached goal data with metadata
 const setCachedGoal = (goalId, data) => {
+  // Prevent cache from growing too large
+  if (goalCache.size >= CACHE_MAX_SIZE) {
+    console.log('🧹 Cache size limit reached, clearing oldest entries');
+    clearOldestCacheEntries();
+  }
+  
   goalCache.set(goalId, {
     data,
     timestamp: Date.now()
   });
+  
+  // Store metadata for smart invalidation
+  cacheMetadata.set(goalId, {
+    agentId: data.agentId,
+    metricType: data.metricType,
+    goalType: data.goalType,
+    lastUpdated: Date.now()
+  });
+  
+  console.log(`💾 Cached goal ${goalId} (${data.metricType} for agent ${data.agentId})`);
 };
 
 // Helper function to clear goal cache
 const clearGoalCache = (goalId = null) => {
   if (goalId) {
     goalCache.delete(goalId);
+    cacheMetadata.delete(goalId);
+    console.log(`🗑️ Cleared cache for goal ${goalId}`);
   } else {
     goalCache.clear();
+    cacheMetadata.clear();
+    console.log('🗑️ Cleared all goal cache');
   }
+};
+
+// Helper function to clear cache by agent and metric type (smart invalidation)
+const clearGoalCacheByMetric = (agentId, metricTypes = []) => {
+  let clearedCount = 0;
+  
+  for (const [goalId, metadata] of cacheMetadata.entries()) {
+    if (metadata.agentId === agentId && 
+        (metricTypes.length === 0 || metricTypes.includes(metadata.metricType))) {
+      goalCache.delete(goalId);
+      cacheMetadata.delete(goalId);
+      clearedCount++;
+    }
+  }
+  
+  console.log(`🎯 Cleared ${clearedCount} goal caches for agent ${agentId} with metrics: ${metricTypes.join(', ')}`);
+};
+
+// Helper function to clear oldest cache entries when limit is reached
+const clearOldestCacheEntries = () => {
+  const entries = Array.from(cacheMetadata.entries())
+    .sort((a, b) => a[1].lastUpdated - b[1].lastUpdated);
+  
+  const toRemove = entries.slice(0, Math.floor(CACHE_MAX_SIZE * 0.2)); // Remove 20% of oldest entries
+  
+  for (const [goalId] of toRemove) {
+    goalCache.delete(goalId);
+    cacheMetadata.delete(goalId);
+  }
+  
+  console.log(`🧹 Removed ${toRemove.length} oldest cache entries`);
 };
 
 // Helper function to clear goal cache on update
 const clearGoalCacheOnUpdate = (goalId) => {
   clearGoalCache(goalId);
-  // Also clear any related caches if needed
+};
+
+// Helper function to invalidate cache when sales/clients data changes
+const invalidateCacheOnDataChange = (agentId, changeType) => {
+  const metricMap = {
+    'sale_added': ['sales_count', 'sales_amount', 'commission'],
+    'sale_updated': ['sales_count', 'sales_amount', 'commission'],
+    'sale_deleted': ['sales_count', 'sales_amount', 'commission'],
+    'client_added': ['new_clients'],
+    'client_updated': ['new_clients'],
+    'client_deleted': ['new_clients']
+  };
+  
+  const metricsToInvalidate = metricMap[changeType] || [];
+  clearGoalCacheByMetric(agentId, metricsToInvalidate);
 };
 
 // Helper function to safely convert decimal values to numbers
@@ -1218,93 +1297,6 @@ router.get('/progress', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /goals/recalculate-progress - Recalculate all goal progress based on existing sales
-router.post('/recalculate-progress', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const userRole = req.user.role;
-
-    console.log('🔄 Recalculate progress endpoint called by user:', userId, 'with role:', userRole);
-
-    // Get all active goals for this user
-    const userGoals = await db.select().from(goals).where(
-      and(
-        eq(goals.agentId, userId),
-        eq(goals.isActive, true)
-      )
-    );
-
-    console.log(`🔄 Found ${userGoals.length} active goals to recalculate`);
-
-    let recalculatedCount = 0;
-    const results = [];
-
-    for (const goal of userGoals) {
-      try {
-        console.log(`🔄 Recalculating goal ${goal.id}: ${goal.title}`);
-        
-        // Calculate current value from database
-        const { total: currentValue } = await calculateExistingData(
-          goal.startDate,
-          goal.endDate,
-          goal.agentId,
-          goal.metricType
-        );
-
-        // Update goal with new current value
-        await db.update(goals)
-          .set({
-            currentValue: currentValue.toString(),
-            updatedAt: new Date()
-          })
-          .where(eq(goals.id, goal.id));
-
-        console.log(`✅ Goal ${goal.id} updated: current value ${goal.currentValue} → ${currentValue}`);
-        
-        // Clear cache for this goal
-        clearGoalCache(goal.id);
-        
-        recalculatedCount++;
-        results.push({
-          goalId: goal.id,
-          title: goal.title,
-          oldValue: goal.currentValue,
-          newValue: currentValue,
-          success: true
-        });
-
-      } catch (error) {
-        console.error(`❌ Error recalculating goal ${goal.id}:`, error);
-        results.push({
-          goalId: goal.id,
-          title: goal.title,
-          error: error.message,
-          success: false
-        });
-      }
-    }
-
-    console.log(`🔄 Recalculation complete: ${recalculatedCount}/${userGoals.length} goals updated`);
-
-    res.json({
-      success: true,
-      message: `Progress recalculated for ${recalculatedCount} goals`,
-      data: {
-        totalGoals: userGoals.length,
-        recalculatedCount,
-        results
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Recalculate progress error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
-  }
-});
 
 // POST /goals/sync-all - Sync all goals with current database state
 router.post('/sync-all', authenticateToken, async (req, res) => {
@@ -1457,5 +1449,187 @@ router.post('/fix-client-counts', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// Register cache invalidation handler
+registerCacheInvalidation('goal_cache_invalidation', async (data) => {
+  const { agentId, changeType, affectedMetrics } = data;
+  clearGoalCacheByMetric(agentId, affectedMetrics);
+});
+
+// POST /goals/recalculate-progress - Queue background job for progress recalculation
+router.post('/recalculate-progress', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`🔄 Queuing progress recalculation for user ${userId} (${userRole})`);
+    
+    // Queue background job for recalculating all goals
+    const jobId = await jobQueue.addJob('recalculate_all_goals', {
+      agentId: userId
+    }, 'high'); // High priority for user-initiated recalculation
+    
+    res.json({
+      success: true,
+      message: 'Progress recalculation queued successfully',
+      jobId,
+      status: 'queued'
+    });
+    
+  } catch (error) {
+    console.error('❌ Queue recalculation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to queue recalculation job',
+      code: 'QUEUE_ERROR',
+      details: error.message
+    });
+  }
+});
+
+// POST /goals/:id/calculate-progress - Queue background job for specific goal
+router.post('/:id/calculate-progress', authenticateToken, async (req, res) => {
+  try {
+    const goalId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    console.log(`🎯 Queuing progress calculation for goal ${goalId}`);
+
+    // Get goal details
+    const goal = await db.select()
+      .from(goals)
+      .where(eq(goals.id, goalId))
+      .limit(1);
+
+    if (!goal || goal.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Goal not found',
+        code: 'GOAL_NOT_FOUND'
+      });
+    }
+
+    const goalData = goal[0];
+
+    // Check access permissions
+    if (userRole !== 'manager' && goalData.agentId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied to this goal',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // Queue background job for calculating this goal's progress
+    const jobId = await jobQueue.addJob('calculate_goal_progress', {
+      goalId: goalData.id,
+      agentId: goalData.agentId,
+      startDate: goalData.startDate,
+      endDate: goalData.endDate,
+      metricType: goalData.metricType
+    }, 'normal');
+    
+    res.json({
+      success: true,
+      message: 'Goal progress calculation queued successfully',
+      jobId,
+      goalId: goalData.id,
+      status: 'queued'
+    });
+    
+  } catch (error) {
+    console.error('❌ Queue goal calculation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to queue goal calculation job',
+      code: 'QUEUE_ERROR',
+      details: error.message
+    });
+  }
+});
+
+// GET /goals/jobs/:jobId - Get job status
+router.get('/jobs/:jobId', authenticateToken, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    const jobStatus = jobQueue.getJobStatus(jobId);
+    
+    if (!jobStatus) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found',
+        code: 'JOB_NOT_FOUND'
+      });
+    }
+    
+    res.json({
+      success: true,
+      job: {
+        id: jobStatus.id,
+        type: jobStatus.type,
+        status: jobStatus.status,
+        progress: jobStatus.status === 'completed' ? 100 : 
+                  jobStatus.status === 'failed' ? 0 : 50,
+        result: jobStatus.result,
+        error: jobStatus.error,
+        createdAt: jobStatus.createdAt,
+        startedAt: jobStatus.startedAt,
+        completedAt: jobStatus.completedAt,
+        attempts: jobStatus.attempts,
+        maxAttempts: jobStatus.maxAttempts
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Get job status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get job status',
+      code: 'JOB_STATUS_ERROR',
+      details: error.message
+    });
+  }
+});
+
+// GET /goals/jobs - Get job queue statistics
+router.get('/jobs', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    // Only managers can view job statistics
+    if (userRole !== 'manager') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied - Manager role required',
+        code: 'ACCESS_DENIED'
+      });
+    }
+    
+    const stats = jobQueue.getStats();
+    
+    res.json({
+      success: true,
+      stats: {
+        ...stats,
+        queueHealth: stats.processingCapacity > 0 ? 'healthy' : 'busy'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Get job stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get job statistics',
+      code: 'JOB_STATS_ERROR',
+      details: error.message
+    });
+  }
+});
+
+// Export cache functions for use in job queue
+export { clearGoalCache, clearGoalCacheByMetric };
 
 export default router;

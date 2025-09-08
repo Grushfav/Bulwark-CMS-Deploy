@@ -77,6 +77,7 @@ export const clientsAPI = {
   // Client Notes API
   getClientNotes: (clientId) => api.get(`/clients/${clientId}/notes`),
   addClientNote: (clientId, noteData) => api.post(`/clients/${clientId}/notes`, noteData),
+  deleteClientNote: (clientId, noteId) => api.delete(`/clients/${clientId}/notes/${noteId}`),
   bulkImportClients: (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -105,6 +106,15 @@ export const salesAPI = {
   updateSale: (id, saleData) => api.put(`/sales/${id}`, saleData),
   updateSaleNotes: (id, notes) => api.patch(`/sales/${id}/notes`, { notes }),
   deleteSale: (id) => api.delete(`/sales/${id}`),
+  bulkImportSales: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/sales/bulk-import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 // Products API
@@ -142,6 +152,12 @@ export const goalsAPI = {
   deleteGoal: (id) => api.delete(`/goals/${id}`),
   updateProgress: () => api.post('/goals/update-progress'),
   recalculateProgress: () => api.post('/goals/recalculate-progress'),
+  
+  // Background job functions
+  queueRecalculateProgress: () => api.post('/goals/recalculate-progress'),
+  queueCalculateGoalProgress: (goalId) => api.post(`/goals/${goalId}/calculate-progress`),
+  getJobStatus: (jobId) => api.get(`/goals/jobs/${jobId}`),
+  getJobStats: () => api.get('/goals/jobs'),
 };
 
 // Team Management API
@@ -272,5 +288,22 @@ export const filesAPI = {
   getSalesTemplate: () => api.get('/files/template/sales', { responseType: 'blob' }),
 };
 
-export default api;
+// Activity Logs API
+export const activityLogsAPI = {
+  getActivityLogs: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/activity-logs${queryString ? `?${queryString}` : ''}`);
+  },
+  getActivityStats: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/activity-logs/stats${queryString ? `?${queryString}` : ''}`);
+  },
+  exportActivityLogs: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/activity-logs/export${queryString ? `?${queryString}` : ''}`, {
+      responseType: 'blob'
+    });
+  }
+};
 
+export default api;

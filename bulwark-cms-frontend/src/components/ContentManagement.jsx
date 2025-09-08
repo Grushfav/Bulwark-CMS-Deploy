@@ -542,6 +542,14 @@ const ContentManagement = () => {
           </Card>
         )}
       </div>
+      
+      {/* Preview Modal */}
+      {previewContent && (
+        <PreviewModal
+          content={previewContent}
+          onClose={closePreview}
+        />
+      )}
     </div>
   );
 };
@@ -723,13 +731,6 @@ const ContentList = ({
           content={editingContent}
           onClose={() => setEditingContent(null)}
           onUpdate={onUpdateContent}
-        />
-      )}
-      
-      {previewContent && (
-        <PreviewModal
-          content={previewContent}
-          onClose={closePreview}
         />
       )}
     </div>

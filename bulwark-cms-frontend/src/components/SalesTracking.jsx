@@ -45,6 +45,8 @@ import {
   Users,
   Calendar,
   MessageSquare,
+  FileText,
+  X,
 } from 'lucide-react';
 
 const SaleForm = ({ sale, onSave, onCancel, products }) => {
@@ -495,28 +497,41 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
 const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
   const [noteText, setNoteText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentSale, setCurrentSale] = useState(sale);
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null);
+
+  // Update currentSale when sale prop changes
+  useEffect(() => {
+    setCurrentSale(sale);
+  }, [sale]);
 
   const handleSaveNote = async () => {
     if (!noteText.trim()) return;
 
     setLoading(true);
     try {
-      console.log('🔧 Saving note for sale:', sale.id);
-      console.log('🔧 Current notes:', sale.notes);
+      console.log('🔧 Saving note for sale:', currentSale.id);
+      console.log('🔧 Current notes:', currentSale.notes);
       console.log('🔧 New note text:', noteText);
       
       // Create a new note entry
       const newNoteEntry = `${new Date().toLocaleString()}: ${noteText}`;
       
       // Combine with existing notes
-      const updatedNotes = sale.notes 
-        ? `${sale.notes}\n\n${newNoteEntry}`
+      const updatedNotes = currentSale.notes 
+        ? `${currentSale.notes}\n\n${newNoteEntry}`
         : newNoteEntry;
 
       console.log('🔧 Updated notes to save:', updatedNotes);
 
+      // Update local state immediately for instant feedback
+      setCurrentSale(prev => ({
+        ...prev,
+        notes: updatedNotes
+      }));
+
       // Use the dedicated notes endpoint
-      const response = await salesAPI.updateSaleNotes(sale.id, updatedNotes);
+      const response = await salesAPI.updateSaleNotes(currentSale.id, updatedNotes);
       console.log('🔧 Notes update response:', response);
       
       // Call the parent's onSaveNote to refresh the sales list
@@ -530,6 +545,9 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
       console.error('Error saving note:', error);
       console.error('Error details:', error.response?.data);
       toast.error('Failed to save note');
+      
+      // Revert local state on error
+      setCurrentSale(sale);
     } finally {
       setLoading(false);
     }
@@ -540,11 +558,57 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
     onOpenChange(false);
   };
 
-  if (!sale) return null;
+  const handleDeleteNote = (noteIndex) => {
+    setDeleteConfirmIndex(noteIndex);
+  };
+
+  const confirmDeleteNote = async () => {
+    if (!currentSale || !currentSale.notes || deleteConfirmIndex === null) return;
+
+    try {
+      // Parse existing notes
+      const notesArray = currentSale.notes.split('\n\n').filter(note => note.trim());
+      
+      // Remove the note at the specified index
+      const updatedNotesArray = notesArray.filter((_, index) => index !== deleteConfirmIndex);
+      
+      // Join back into string format
+      const updatedNotes = updatedNotesArray.join('\n\n');
+
+      // Update local state immediately
+      setCurrentSale(prev => ({
+        ...prev,
+        notes: updatedNotes
+      }));
+
+      // Update on server
+      const response = await salesAPI.updateSaleNotes(currentSale.id, updatedNotes);
+      console.log('🔧 Delete note response:', response);
+      
+      // Call parent's onSaveNote to refresh the sales list
+      onSaveNote();
+      
+      toast.success('Note deleted successfully');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Failed to delete note');
+      
+      // Revert local state on error
+      setCurrentSale(sale);
+    } finally {
+      setDeleteConfirmIndex(null);
+    }
+  };
+
+  const cancelDeleteNote = () => {
+    setDeleteConfirmIndex(null);
+  };
+
+  if (!currentSale) return null;
 
   // Parse existing notes to display them nicely
-  const existingNotes = sale.notes 
-    ? sale.notes.split('\n\n').filter(note => note.trim())
+  const existingNotes = currentSale.notes 
+    ? currentSale.notes.split('\n\n').filter(note => note.trim())
     : [];
 
   return (
@@ -553,7 +617,7 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            Sale Notes - {sale.client?.firstName} {sale.client?.lastName}
+            Sale Notes - {currentSale.client?.firstName} {currentSale.client?.lastName}
           </DialogTitle>
           <DialogDescription>
             View and add notes for this sale. Notes are timestamped and help track important details.
@@ -564,15 +628,31 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
           {/* Display existing notes */}
           {existingNotes.length > 0 ? (
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Existing Notes ({existingNotes.length}):</Label>
+              <Label className="text-sm font-medium">
+                Existing Notes ({existingNotes.length})
+                <span className="text-xs text-gray-500 ml-2">• Hover over notes to delete</span>
+              </Label>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {existingNotes.map((note, index) => {
                   const [timestamp, ...contentParts] = note.split(': ');
                   const content = contentParts.join(': ');
                   return (
-                    <div key={index} className="p-3 bg-gray-50 rounded-lg border">
-                      <div className="text-sm text-gray-700 mb-1">{content}</div>
-                      <div className="text-xs text-gray-500">{timestamp}</div>
+                    <div key={index} className="relative p-3 bg-gray-50 rounded-lg border group hover:border-red-200 hover:shadow-sm transition-all duration-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 pr-8">
+                          <div className="text-sm text-gray-700 mb-1">{content}</div>
+                          <div className="text-xs text-gray-500">{timestamp}</div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteNote(index)}
+                        className="absolute top-2 right-2 opacity-70 hover:opacity-100 transition-all duration-200 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        title="Delete note"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
                   );
                 })}
@@ -613,6 +693,33 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmIndex !== null} onOpenChange={cancelDeleteNote}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Delete Note
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteNote}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteNote}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
@@ -767,19 +874,78 @@ const SalesTracking = () => {
     }
   };
 
+  const downloadSalesTemplate = () => {
+    const headers = [
+      'clientEmail',
+      'productName', 
+      'premiumAmount',
+      'commissionAmount',
+      'commissionRate',
+      'saleDate',
+      'policyNumber',
+      'status',
+      'notes'
+    ];
+    
+    const sampleData = [
+      'john.doe@email.com',
+      'Life Insurance Premium',
+      '1500.00',
+      '150.00',
+      '10.00',
+      '2024-01-15',
+      'POL-2024-001',
+      'active',
+      'Initial premium payment'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      sampleData.join(',')
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sales_import_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast.success('Sales CSV template downloaded successfully');
+  };
+
   const handleUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     try {
-      const response = await filesAPI.uploadSales(file);
       setError('');
-      alert(`Successfully imported ${response.data.created_sales.length} sales`);
-      fetchSales();
-      // Goal progress is updated automatically by the backend
+      toast.info('Importing sales from CSV...');
+      
+      const response = await salesAPI.bulkImportSales(file);
+      
+      if (response.data && response.data.success) {
+        const { imported_count, errors } = response.data.data;
+        
+        if (errors && errors.length > 0) {
+          toast.warning(`Import completed with ${errors.length} errors. ${imported_count} sales imported successfully.`);
+          console.log('Import errors:', errors);
+        } else {
+          toast.success(`Successfully imported ${imported_count} sales!`);
+        }
+        
+        fetchSales();
+        // Goal progress is updated automatically by the backend
+      } else {
+        toast.error('Import failed - no data received');
+      }
       
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to upload sales');
+      console.error('CSV import error:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to import sales';
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
     event.target.value = '';
   };
@@ -840,7 +1006,7 @@ const SalesTracking = () => {
           {/* Allow both managers and agents to import sales */}
           <input
             type="file"
-            accept=".xlsx,.xls"
+            accept=".csv"
             onChange={handleUpload}
             className="hidden"
             id="upload-sales"
@@ -851,11 +1017,15 @@ const SalesTracking = () => {
             className="w-full sm:w-auto justify-center sm:justify-start"
           >
             <Upload className="h-4 w-4 mr-2" />
-            Import
+            Import CSV
+          </Button>
+          <Button variant="outline" onClick={downloadSalesTemplate} className="w-full sm:w-auto justify-center sm:justify-start">
+            <FileText className="h-4 w-4 mr-2" />
+            Download Template
           </Button>
           <Button variant="outline" onClick={handleDownload} className="w-full sm:w-auto justify-center sm:justify-start">
             <Download className="h-4 w-4 mr-2" />
-            Export
+            Export CSV
           </Button>
           <Dialog open={showForm} onOpenChange={setShowForm}>
             <DialogTrigger asChild>

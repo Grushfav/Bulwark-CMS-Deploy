@@ -194,7 +194,7 @@ const CreateMemberDialog = ({ onCreateMember }) => {
                 required
               />
               {errors.firstName && (
-                <p className="text-sm text-red-500 mt-1">{errors.firstName}</p>
+                <p className="text-sm text-destructive mt-1">{errors.firstName}</p>
               )}
             </div>
             <div>
@@ -207,7 +207,7 @@ const CreateMemberDialog = ({ onCreateMember }) => {
                 required
               />
               {errors.lastName && (
-                <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>
+                <p className="text-sm text-destructive mt-1">{errors.lastName}</p>
               )}
             </div>
           </div>
@@ -222,7 +222,7 @@ const CreateMemberDialog = ({ onCreateMember }) => {
               required
             />
             {errors.email && (
-              <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+              <p className="text-sm text-destructive mt-1">{errors.email}</p>
             )}
           </div>
           <div>
@@ -249,7 +249,7 @@ const CreateMemberDialog = ({ onCreateMember }) => {
               required
             />
             {errors.password && (
-              <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              <p className="text-sm text-destructive mt-1">{errors.password}</p>
             )}
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
@@ -357,7 +357,7 @@ const PasswordResetDialog = ({ member, onPasswordReset, open, onOpenChange }) =>
               </Button>
             </div>
             {errors.new_password && (
-              <p className="text-sm text-red-500 mt-1">{errors.new_password}</p>
+              <p className="text-sm text-destructive mt-1">{errors.new_password}</p>
             )}
           </div>
           
@@ -373,7 +373,7 @@ const PasswordResetDialog = ({ member, onPasswordReset, open, onOpenChange }) =>
               minLength={6}
             />
             {errors.confirm_password && (
-              <p className="text-sm text-red-500 mt-1">{errors.confirm_password}</p>
+              <p className="text-sm text-destructive mt-1">{errors.confirm_password}</p>
             )}
           </div>
           
@@ -505,10 +505,10 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               {firstName?.[0] || 'U'}{lastName?.[0] || 'U'}
             </div>
             <div>
-              <CardTitle className="text-lg text-gray-900 dark:text-white">
+              <CardTitle className="text-lg">
                 {firstName} {lastName}
               </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{email}</p>
+              <p className="text-sm text-muted-foreground">{email}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -529,45 +529,45 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {totalSales.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Sales Count</div>
+              <div className="text-xs text-muted-foreground">Sales Count</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 ${totalRevenue.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Total Revenue</div>
+              <div className="text-xs text-muted-foreground">Total Revenue</div>
             </div>
           </div>
           
           {/* Additional Metrics */}
           <div className="grid grid-cols-2 gap-2 text-center text-sm">
-            <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+            <div className="bg-muted/50 p-2 rounded">
               <div className="text-lg font-semibold text-green-600 dark:text-green-400">
                 ${monthlySales.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">This month's sales</div>
+              <div className="text-xs text-muted-foreground">This month's sales</div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+            <div className="bg-muted/50 p-2 rounded">
               <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">
                 ${monthlyCommission.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Commission</div>
+              <div className="text-xs text-muted-foreground">Commission</div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+            <div className="bg-muted/50 p-2 rounded">
               <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
                 {monthlyClients.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">This month's clients</div>
+              <div className="text-xs text-muted-foreground">This month's clients</div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+            <div className="bg-muted/50 p-2 rounded">
               <div className="text-lg font-semibold text-orange-600 dark:text-orange-400">
                 {monthlyProspects.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">This month's prospects</div>
+              <div className="text-xs text-muted-foreground">This month's prospects</div>
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -588,7 +588,7 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
             </Button>
           </div>
           
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -613,7 +613,7 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               variant="outline"
               size="sm"
               onClick={() => onDelete(member)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
               disabled={statusType === 'deleted'}
               title={statusType === 'deleted' ? 'User is already deleted' : ''}
             >
@@ -861,8 +861,8 @@ const TeamManagement = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Authentication Required</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">Please log in to access team management.</p>
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-muted-foreground mb-4">Please log in to access team management.</p>
         </div>
       </div>
     );
@@ -872,9 +872,9 @@ const TeamManagement = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">You need manager privileges to access team management.</p>
+          <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-4">You need manager privileges to access team management.</p>
         </div>
       </div>
     );
@@ -906,9 +906,9 @@ const TeamManagement = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Error Loading Team Members</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+          <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Error Loading Team Members</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <div className="flex gap-2 justify-center">
             <Button onClick={loadMembers} className="bg-primary">
               Try Again
@@ -923,7 +923,7 @@ const TeamManagement = () => {
               Clear Error
             </Button>
           </div>
-          <p className="text-sm text-gray-500 mt-4">
+          <p className="text-sm text-muted-foreground mt-4">
             If the problem persists, try refreshing the page or contact support.
           </p>
         </div>
@@ -936,14 +936,14 @@ const TeamManagement = () => {
       {/* Header - Improved Mobile Layout */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Team Management</h1>
-          <p className="text-gray-600 text-sm sm:text-base">Manage your team members and track their performance</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Team Management</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Manage your team members and track their performance</p>
         </div>
         <CreateMemberDialog onCreateMember={createMember} />
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -952,7 +952,7 @@ const TeamManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold">
               {loading ? (
-                <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                <div className="animate-pulse bg-muted h-8 w-16 rounded"></div>
               ) : (
                 members.length
               )}
@@ -967,7 +967,7 @@ const TeamManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
               {loading ? (
-                <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                <div className="animate-pulse bg-muted h-8 w-16 rounded"></div>
               ) : (
                 members.filter(m => {
                   const isActive = safeGet(m, 'isActive', true) !== false && safeGet(m, 'is_active', true) !== false;
@@ -985,7 +985,7 @@ const TeamManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
               {loading ? (
-                <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                <div className="animate-pulse bg-muted h-8 w-16 rounded"></div>
               ) : (
                 members.filter(m => {
                   const isActive = safeGet(m, 'isActive', true) !== false && safeGet(m, 'is_active', true) !== false;
@@ -1003,7 +1003,7 @@ const TeamManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
               {loading ? (
-                <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                <div className="animate-pulse bg-muted h-8 w-16 rounded"></div>
               ) : (
                 members.reduce((sum, m) => {
                   const totalSales = safeNumber(safeGet(m, 'metrics.total_sales', 0));
@@ -1020,13 +1020,13 @@ const TeamManagement = () => {
       {/* Members Grid */}
       {members.length === 0 ? (
         <div className="text-center py-12">
-          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No team members found</h3>
-          <p className="text-gray-600 mb-4">Get started by creating your first team member.</p>
+          <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">No team members found</h3>
+          <p className="text-muted-foreground mb-4">Get started by creating your first team member.</p>
           <CreateMemberDialog onCreateMember={createMember} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {members.map((member) => (
             <MemberCard
               key={member.id}

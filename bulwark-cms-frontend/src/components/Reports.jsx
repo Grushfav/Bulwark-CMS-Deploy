@@ -16,8 +16,10 @@ import {
   Target, Activity, Filter, RefreshCw, Eye, FileSpreadsheet, AlertTriangle
 } from 'lucide-react';
 import { reportsAPI, userProfileAPI, salesAPI } from '../lib/api.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 const Reports = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState({
@@ -411,7 +413,7 @@ const Reports = () => {
     } catch (error) {
       console.error('Chart rendering error:', error);
       return (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
           <p>{fallback}</p>
         </div>
       );
@@ -422,8 +424,8 @@ const Reports = () => {
   const ChartLoadingState = ({ height = 300 }) => (
     <div className="flex items-center justify-center" style={{ height }}>
       <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        <p className="text-sm text-gray-600">Loading chart data...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+        <p className="text-sm text-muted-foreground">Loading chart data...</p>
       </div>
     </div>
   );
@@ -431,7 +433,7 @@ const Reports = () => {
   // Chart empty state component
   const ChartEmptyState = ({ message = "No data available", height = 300 }) => (
     <div className="flex items-center justify-center" style={{ height }}>
-      <div className="text-center text-gray-500">
+      <div className="text-center text-muted-foreground">
         <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
         <p>{message}</p>
       </div>
@@ -457,10 +459,10 @@ const Reports = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">Comprehensive business insights and performance analysis</p>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Comprehensive business insights and performance analysis</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={handleRefresh} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto justify-center sm:justify-start">
+          <Button onClick={handleRefresh} disabled={loading} className="w-full sm:w-auto justify-center sm:justify-start">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Generating...' : 'Refresh Reports'}
         </Button>
@@ -488,18 +490,18 @@ const Reports = () => {
 
       {/* Initial Loading State */}
       {!isInitialized && (
-        <Card className="border-blue-200 bg-blue-50">
+        <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
-            <CardTitle className="text-blue-800 flex items-center">
+            <CardTitle className="text-primary flex items-center">
               <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
               Initializing Reports
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-blue-700 mb-4">Loading initial data and generating your first reports...</p>
+            <p className="text-primary/80 mb-4">Loading initial data and generating your first reports...</p>
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="text-sm text-blue-600">Please wait...</span>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              <span className="text-sm text-primary">Please wait...</span>
             </div>
           </CardContent>
         </Card>
@@ -507,15 +509,15 @@ const Reports = () => {
 
       {/* Error Display */}
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive/20 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-red-800 flex items-center">
+            <CardTitle className="text-destructive flex items-center">
               <AlertTriangle className="h-5 w-5 mr-2" />
               Error Loading Reports
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-700 mb-4">{error}</p>
+            <p className="text-destructive/80 mb-4">{error}</p>
             <div className="flex gap-2">
               <Button 
                 onClick={() => {
@@ -604,7 +606,7 @@ const Reports = () => {
                 </SelectContent>
               </Select>
                   {memoizedAgents.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">Loading agent list...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Loading agent list...</p>
                   )}
             </div>
           </div>
@@ -613,10 +615,10 @@ const Reports = () => {
 
       {/* Report Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <TabsList className={`grid w-full gap-2 ${user?.role === 'manager' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="sales">Sales</TabsTrigger>
-              <TabsTrigger value="agents">Agents</TabsTrigger>
+              {user?.role === 'manager' && <TabsTrigger value="agents">Agents</TabsTrigger>}
               <TabsTrigger value="clients">Clients</TabsTrigger>
               <TabsTrigger value="goals">Goals</TabsTrigger>
         </TabsList>
@@ -709,10 +711,11 @@ const Reports = () => {
                       ]}
                       labelFormatter={(label) => `Month: ${label}`}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #ccc',
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        padding: '12px'
+                        padding: '12px',
+                        color: 'hsl(var(--popover-foreground))'
                       }}
                     />
                     <Legend />
@@ -760,10 +763,11 @@ const Reports = () => {
                         'Sales Count'
                       ]}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #ccc',
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        padding: '12px'
+                        padding: '12px',
+                        color: 'hsl(var(--popover-foreground))'
                       }}
                     />
                   </PieChart>
@@ -911,10 +915,11 @@ const Reports = () => {
                       ]}
                       labelFormatter={(label) => `Product: ${label}`}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #ccc',
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        padding: '12px'
+                        padding: '12px',
+                        color: 'hsl(var(--popover-foreground))'
                       }}
                     />
                     <Legend />
@@ -959,8 +964,9 @@ const Reports = () => {
             </Card>
           </div>
 
-              {/* Agent Sales Performance Section */}
-              <Card>
+              {/* Agent Sales Performance Section - Manager Only */}
+              {user?.role === 'manager' && (
+                <Card>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div>
@@ -1076,9 +1082,11 @@ const Reports = () => {
                   )}
                 </CardContent>
               </Card>
+              )}
         </TabsContent>
 
-        {/* Agent Performance Tab */}
+        {/* Agent Performance Tab - Manager Only */}
+        {user?.role === 'manager' && (
         <TabsContent value="agents" className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">Agent Performance</h2>
@@ -1116,10 +1124,11 @@ const Reports = () => {
                       ]}
                       labelFormatter={(label) => `Agent: ${label}`}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #ccc',
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        padding: '12px'
+                        padding: '12px',
+                        color: 'hsl(var(--popover-foreground))'
                       }}
                     />
                     <Legend />
@@ -1140,19 +1149,19 @@ const Reports = () => {
               <CardContent>
                 <div className="space-y-4">
                       {memoizedReportData.agentPerformance.map((agent, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <Badge variant={index === 0 ? "default" : "secondary"}>
                           #{index + 1}
                         </Badge>
                         <div>
                           <p className="font-medium">{agent.name}</p>
-                          <p className="text-sm text-gray-600">{agent.sales} sales</p>
+                          <p className="text-sm text-muted-foreground">{agent.sales} sales</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-bold">{formatCurrency(agent.premium)}</p>
-                        <p className="text-sm text-gray-600">{formatCurrency(agent.commission)} commission</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(agent.commission)} commission</p>
                       </div>
                     </div>
                   ))}
@@ -1274,6 +1283,7 @@ const Reports = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Client Analytics Tab */}
         <TabsContent value="clients" className="space-y-6">
@@ -1312,10 +1322,10 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">
+                  <div className="text-3xl font-bold text-green-600 dark:text-green-400">
                         {memoizedReportData.salesSummary?.totalSales || 0}
                   </div>
-                  <p className="text-sm text-gray-600 mt-2">New clients acquired in selected period</p>
+                  <p className="text-sm text-muted-foreground mt-2">New clients acquired in selected period</p>
                 </div>
               </CardContent>
             </Card>
@@ -1326,10 +1336,10 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-3xl font-bold text-primary">
                         {formatCurrency(memoizedReportData.salesSummary?.averageDealSize || 0)}
                   </div>
-                  <p className="text-sm text-gray-600 mt-2">Average premium per client</p>
+                  <p className="text-sm text-muted-foreground mt-2">Average premium per client</p>
                 </div>
               </CardContent>
             </Card>
@@ -1494,13 +1504,13 @@ const Reports = () => {
                       <span>Progress</span>
                       <span>{formatPercentage(goal.progress)}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-muted rounded-full h-2">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(goal.progress, 100)}%` }}
                       ></div>
                     </div>
-                    <div className="flex justify-between text-sm text-gray-600">
+                    <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Current: {formatCurrency(goal.current)}</span>
                       <span>Target: {formatCurrency(goal.target)}</span>
                     </div>

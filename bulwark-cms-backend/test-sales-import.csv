@@ -1,0 +1,4 @@
+clientEmail,productName,premiumAmount,commissionAmount,commissionRate,saleDate,policyNumber,status,notes
+john.doe@email.com,Life Insurance Premium,1500.00,150.00,10.00,2024-01-15,POL-2024-001,active,Initial premium payment
+jane.smith@email.com,Health Insurance Plan,2000.00,200.00,10.00,2024-01-20,POL-2024-002,active,Monthly premium
+testmanager@bulwark.com,Term Life Insurance,1200.00,120.00,10.00,2024-01-25,POL-2024-003,active,Annual premium

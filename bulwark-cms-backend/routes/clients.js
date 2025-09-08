@@ -1,14 +1,16 @@
 import express from 'express';
 import { body, validationResult, query } from 'express-validator';
 import { db } from '../config/database.js';
-import { clients, users, clientNotes, goals } from '../models/schema.js';
+import { clients, users, clientNotes, goals, reminders, sales } from '../models/schema.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { requireManager, canViewAllData } from '../middleware/roleCheck.js';
 import { uploadBulk } from '../middleware/upload.js';
 import { eq, and, like, or, desc, asc, count } from 'drizzle-orm';
 import csv from 'csv-parser';
 import fs from 'fs';
+import { ActivityLogger } from '../utils/activityLogger.js';
 import path from 'path';
+import { invalidateGoalCacheOnClientChange } from '../utils/cacheInvalidation.js';
 
 const router = express.Router();
 
@@ -339,6 +341,24 @@ router.post('/', authenticateToken, validateClient, async (req, res) => {
     // Update goal progress after client creation
     await updateGoalProgressOnClientCreate(agentId);
 
+    // Invalidate goal cache for this agent
+    await invalidateGoalCacheOnClientChange(agentId, 'client_added');
+
+    // Log the client creation activity
+    await ActivityLogger.logClientActivity(
+      agentId,
+      'created',
+      newClient[0].id,
+      {
+        clientName: `${firstName} ${lastName}`,
+        email: email,
+        status: status || 'prospect'
+      },
+      null,
+      newClient[0],
+      req
+    );
+
     res.status(201).json({
       message: 'Client created successfully',
       client: newClient[0]
@@ -418,6 +438,21 @@ router.put('/:id', authenticateToken, validateClient, async (req, res) => {
       .where(eq(clients.id, clientId))
       .returning();
 
+    // Log the client update activity
+    await ActivityLogger.logClientActivity(
+      userId,
+      'updated',
+      clientId,
+      {
+        clientName: `${firstName} ${lastName}`,
+        email: email,
+        status: status
+      },
+      clientData,
+      updatedClient[0],
+      req
+    );
+
     res.json({
       message: 'Client updated successfully',
       client: updatedClient[0]
@@ -447,8 +482,25 @@ router.delete('/:id', authenticateToken, requireManager, async (req, res) => {
       });
     }
 
-    // Delete client notes first
+    // Delete related records first (in order of dependencies)
     await db.delete(clientNotes).where(eq(clientNotes.clientId, clientId));
+    await db.delete(reminders).where(eq(reminders.clientId, clientId));
+    await db.delete(sales).where(eq(sales.clientId, clientId));
+
+    // Log the client deletion activity before deleting
+    await ActivityLogger.logClientActivity(
+      req.user.id,
+      'deleted',
+      clientId,
+      {
+        clientName: `${existingClient[0].firstName} ${existingClient[0].lastName}`,
+        email: existingClient[0].email,
+        status: existingClient[0].status
+      },
+      existingClient[0],
+      null,
+      req
+    );
 
     // Delete client
     await db.delete(clients).where(eq(clients.id, clientId));
@@ -522,6 +574,65 @@ router.post('/:id/notes', authenticateToken, validateClientNote, async (req, res
   } catch (error) {
     console.error('Add note error:', error);
     res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// DELETE /clients/:id/notes/:noteId - Delete a specific note
+router.delete('/:id/notes/:noteId', authenticateToken, async (req, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    const noteId = parseInt(req.params.noteId);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Check if client exists and user has access
+    const client = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+    
+    if (!client || client.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found',
+        code: 'CLIENT_NOT_FOUND'
+      });
+    }
+
+    // Check permissions - users can only access their own clients unless they're managers
+    if (client[0].agentId !== userId && userRole !== 'manager') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied to this client',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // Check if note exists and belongs to this client
+    const note = await db.select().from(clientNotes)
+      .where(and(eq(clientNotes.id, noteId), eq(clientNotes.clientId, clientId)))
+      .limit(1);
+
+    if (!note || note.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Note not found',
+        code: 'NOTE_NOT_FOUND'
+      });
+    }
+
+    // Delete the note
+    await db.delete(clientNotes).where(eq(clientNotes.id, noteId));
+
+    res.json({
+      success: true,
+      message: 'Note deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete note error:', error);
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_ERROR'
     });
@@ -734,6 +845,20 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
               throw insertError;
             }
           }
+
+          // Log the bulk import activity
+          await ActivityLogger.logBulkOperation(
+            req.user.id,
+            'client',
+            'imported',
+            {
+              importedCount: insertedClients.length,
+              totalRows: results.length,
+              fileName: req.file?.originalname || 'unknown',
+              errors: errors.length > 0 ? errors : null
+            },
+            req
+          );
 
           res.json({
             message: 'Bulk import completed successfully',

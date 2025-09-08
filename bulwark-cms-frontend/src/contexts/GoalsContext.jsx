@@ -59,10 +59,16 @@ export const GoalsProvider = ({ children }) => {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { user, canViewAllData } = useAuth();
+  const { user, canViewAllData, loading: authLoading } = useAuth();
 
   // Fetch goals with proper error handling and data formatting
   const fetchGoals = useCallback(async () => {
+    // Wait for authentication to complete
+    if (authLoading) {
+      console.log('🔍 GoalsContext: Authentication still loading, skipping goal fetch');
+      return;
+    }
+    
     if (!user?.id) {
       console.log('🔍 GoalsContext: No user found, skipping goal fetch');
       setGoals([]);
@@ -153,7 +159,7 @@ export const GoalsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   // Auto-fetch goals when user changes
   useEffect(() => {
@@ -173,7 +179,7 @@ export const GoalsProvider = ({ children }) => {
       endDate: typeof goalData.endDate,
       notes: typeof goalData.notes
     });
-    setLoading(true);
+      setLoading(true);
     setError(null);
 
     try {
@@ -280,43 +286,83 @@ export const GoalsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
 
-    try {
-      await goalsAPI.deleteGoal(goalId);
+      try {
+        await goalsAPI.deleteGoal(goalId);
       
       // Remove the goal from the current goals list
       setGoals(prevGoals => prevGoals.filter(goal => goal.id !== goalId));
       
       console.log('✅ GoalsContext: Goal deleted successfully');
-    } catch (error) {
+      } catch (error) {
       console.error('❌ GoalsContext: Error deleting goal:', error);
       setError(error.response?.data?.error || 'Failed to delete goal');
+        throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Recalculate progress using background jobs
+  const recalculateProgress = useCallback(async () => {
+    console.log('🔍 GoalsContext: Queuing progress recalculation');
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await goalsAPI.queueRecalculateProgress();
+      console.log('🔍 GoalsContext: Queue response:', response);
+
+      if (response.data && response.data.success) {
+        const { jobId } = response.data;
+        console.log(`📋 Background job queued: ${jobId}`);
+        
+        // Poll for job completion
+        return await pollJobCompletion(jobId);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('❌ GoalsContext: Error queuing recalculation:', error);
+      setError(error.response?.data?.error || 'Failed to queue recalculation');
       throw error;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Recalculate progress
-  const recalculateProgress = useCallback(async () => {
-    console.log('🔍 GoalsContext: Recalculating progress');
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await goalsAPI.recalculateProgress();
-      console.log('🔍 GoalsContext: Recalculate response:', response);
-
-      // Refresh goals after recalculation
-      await fetchGoals();
-      
-      return response;
-    } catch (error) {
-      console.error('❌ GoalsContext: Error recalculating progress:', error);
-      setError(error.response?.data?.error || 'Failed to recalculate progress');
-      throw error;
-    } finally {
-      setLoading(false);
+  // Poll job completion
+  const pollJobCompletion = useCallback(async (jobId, maxAttempts = 30) => {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const response = await goalsAPI.getJobStatus(jobId);
+        
+        if (response.data && response.data.success) {
+          const job = response.data.job;
+          
+          if (job.status === 'completed') {
+            console.log('✅ Background job completed:', jobId);
+            // Refresh goals after completion
+            await fetchGoals();
+            return { success: true, result: job.result };
+          } else if (job.status === 'failed') {
+            console.error('❌ Background job failed:', jobId, job.error);
+            throw new Error(job.error || 'Background job failed');
+          } else {
+            // Job still processing, wait and try again
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error polling job status:', error);
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
+    
+    throw new Error('Job completion timeout');
   }, [fetchGoals]);
 
   // Legacy handlers for backward compatibility

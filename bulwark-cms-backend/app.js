@@ -10,6 +10,7 @@ import teamRoutes from './routes/team.js';
 import reportRoutes from './routes/reports.js';
 import fileRoutes from './routes/files.js';
 import productRoutes from './routes/products.js';
+import activityLogRoutes from './routes/activityLogs.js';
 
 const app = express();
 
@@ -36,7 +37,8 @@ app.get('/', (req, res) => {
       team: '/team',
       reports: '/reports',
       files: '/files',
-      products: '/products'
+      products: '/products',
+      activityLogs: '/activity-logs'
     },
     documentation: 'API documentation and usage examples available in the README'
   });
@@ -54,5 +56,6 @@ app.use('/team', teamRoutes);
 app.use('/reports', reportRoutes);
 app.use('/files', fileRoutes);
 app.use('/products', productRoutes);
+app.use('/activity-logs', activityLogRoutes);
 
 export default app;

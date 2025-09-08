@@ -5,6 +5,11 @@ import { sales, clients, users, products, goals } from '../models/schema.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { requireManager, canViewAllData } from '../middleware/roleCheck.js';
 import { eq, and, like, or, desc, asc, gte, lte, sum, count } from 'drizzle-orm';
+import { invalidateGoalCacheOnSaleChange } from '../utils/cacheInvalidation.js';
+import multer from 'multer';
+import csv from 'csv-parser';
+import fs from 'fs';
+import path from 'path';
 
 const router = express.Router();
 
@@ -592,6 +597,9 @@ router.post('/', authenticateToken, validateSale, async (req, res) => {
     await updateGoalProgress(agentId, newSale[0]);
     console.log('✅ Goal progress update completed');
 
+    // Invalidate goal cache for this agent
+    await invalidateGoalCacheOnSaleChange(agentId, 'sale_added');
+
     res.status(201).json({
       message: 'Sale created successfully',
       sale: newSale[0]
@@ -677,6 +685,9 @@ router.put('/:id', authenticateToken, validateSale, async (req, res) => {
 
     // Update goal progress after sale modification
     await updateGoalProgressOnModify(oldSaleData.agentId, oldSaleData, updatedSale[0]);
+
+    // Invalidate goal cache for this agent
+    await invalidateGoalCacheOnSaleChange(oldSaleData.agentId, 'sale_updated');
 
     res.json({
       message: 'Sale updated successfully',
@@ -788,6 +799,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     // Update goal progress after sale deletion
     await updateGoalProgressOnDelete(saleData.agentId, saleData);
 
+    // Invalidate goal cache for this agent
+    await invalidateGoalCacheOnSaleChange(saleData.agentId, 'sale_deleted');
+
     res.json({
       message: 'Sale deleted successfully'
     });
@@ -896,7 +910,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         totalPremium: sum(sales.premiumAmount),
         totalCommission: sum(sales.commissionAmount)
       }).from(sales)
-      .leftJoin(users, eq(sales.agentId, users.id));
+      .innerJoin(users, eq(sales.agentId, users.id));
 
       if (whereConditions.length > 0) {
         agentQuery.where(and(...whereConditions));
@@ -928,6 +942,244 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Internal server error',
       code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// Configure multer for CSV uploads
+const upload = multer({
+  dest: 'uploads/',
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
+
+// POST /sales/bulk-import - Bulk import sales from CSV
+router.post('/bulk-import', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded',
+        code: 'NO_FILE'
+      });
+    }
+
+    console.log('📊 CSV bulk import started for user:', userId);
+    console.log('📄 File:', req.file.originalname, 'Size:', req.file.size);
+
+    const results = [];
+    const errors = [];
+    let importedCount = 0;
+
+    // Read and parse CSV file
+    const csvData = [];
+    
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(req.file.path)
+        .pipe(csv({
+          headers: [
+            'clientEmail',
+            'productName', 
+            'premiumAmount',
+            'commissionAmount',
+            'commissionRate',
+            'saleDate',
+            'policyNumber',
+            'status',
+            'notes'
+          ],
+          skipEmptyLines: true
+        }))
+        .on('data', (data) => {
+          // Skip empty rows
+          if (!data || Object.keys(data).length === 0) {
+            return;
+          }
+          
+          // Skip header row if it's being processed as data
+          if (data.clientEmail === 'clientEmail' && data.productName === 'productName') {
+            return;
+          }
+          
+          csvData.push(data);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    console.log(`📊 Processing ${csvData.length} sales records`);
+
+    // Process each sales record
+    for (let i = 0; i < csvData.length; i++) {
+      const row = csvData[i];
+      const rowNumber = i + 2; // +2 because we skip header and start from 1
+
+      try {
+        // Validate required fields
+        if (!row.clientEmail || !row.productName || !row.premiumAmount || !row.saleDate) {
+          errors.push({
+            row: rowNumber,
+            error: 'Missing required fields (clientEmail, productName, premiumAmount, saleDate)'
+          });
+          continue;
+        }
+
+        // Find client by email
+        const client = await db.select()
+          .from(clients)
+          .where(eq(clients.email, row.clientEmail))
+          .limit(1);
+
+        if (!client || client.length === 0) {
+          errors.push({
+            row: rowNumber,
+            clientEmail: row.clientEmail,
+            error: 'Client not found with this email'
+          });
+          continue;
+        }
+
+        // Find product by name
+        const product = await db.select()
+          .from(products)
+          .where(eq(products.name, row.productName))
+          .limit(1);
+
+        if (!product || product.length === 0) {
+          errors.push({
+            row: rowNumber,
+            productName: row.productName,
+            error: 'Product not found with this name'
+          });
+          continue;
+        }
+
+        // Validate and convert data
+        const premiumAmount = parseFloat(row.premiumAmount);
+        const commissionAmount = row.commissionAmount ? parseFloat(row.commissionAmount) : 0;
+        const commissionRate = row.commissionRate ? parseFloat(row.commissionRate) : null;
+
+        if (isNaN(premiumAmount) || premiumAmount <= 0) {
+          errors.push({
+            row: rowNumber,
+            premiumAmount: row.premiumAmount,
+            error: 'Invalid premium amount'
+          });
+          continue;
+        }
+
+        // Parse and validate sale date
+        const saleDate = new Date(row.saleDate);
+        if (isNaN(saleDate.getTime())) {
+          errors.push({
+            row: rowNumber,
+            saleDate: row.saleDate,
+            error: 'Invalid sale date format (use YYYY-MM-DD)'
+          });
+          continue;
+        }
+
+        // Validate status
+        const validStatuses = ['active', 'cancelled', 'expired'];
+        const status = row.status && validStatuses.includes(row.status.toLowerCase()) 
+          ? row.status.toLowerCase() 
+          : 'active';
+
+        // Create sale record
+        const newSale = await db.insert(sales).values({
+          agentId: userId,
+          clientId: client[0].id,
+          productId: product[0].id,
+          premiumAmount: premiumAmount.toString(),
+          commissionAmount: commissionAmount.toString(),
+          commissionRate: commissionRate ? commissionRate.toString() : null,
+          saleDate: saleDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+          policyNumber: row.policyNumber || null,
+          status: status,
+          productName: row.productName,
+          notes: row.notes || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }).returning();
+
+        console.log(`✅ Sale imported: ${newSale[0].id} - ${client[0].firstName} ${client[0].lastName}`);
+        
+        results.push({
+          row: rowNumber,
+          saleId: newSale[0].id,
+          clientName: `${client[0].firstName} ${client[0].lastName}`,
+          productName: row.productName,
+          premiumAmount: premiumAmount,
+          success: true
+        });
+
+        importedCount++;
+
+        // Update goal progress
+        await updateGoalProgress(userId, newSale[0]);
+
+        // Invalidate goal cache
+        await invalidateGoalCacheOnSaleChange(userId, 'sale_added');
+
+      } catch (error) {
+        console.error(`❌ Error processing row ${rowNumber}:`, error);
+        errors.push({
+          row: rowNumber,
+          error: error.message
+        });
+      }
+    }
+
+    // Clean up uploaded file
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch (cleanupError) {
+      console.error('Failed to cleanup uploaded file:', cleanupError);
+    }
+
+    console.log(`📊 Import completed: ${importedCount} successful, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      message: `Sales import completed: ${importedCount} imported, ${errors.length} errors`,
+      data: {
+        imported_count: importedCount,
+        total_rows: csvData.length,
+        results: results.slice(0, 10), // Return first 10 results
+        errors: errors.slice(0, 10), // Return first 10 errors
+        has_more_results: results.length > 10,
+        has_more_errors: errors.length > 10
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ CSV bulk import error:', error);
+    
+    // Clean up uploaded file if it exists
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Failed to cleanup uploaded file:', cleanupError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'IMPORT_ERROR',
+      details: error.message
     });
   }
 });

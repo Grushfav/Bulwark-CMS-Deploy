@@ -264,16 +264,30 @@ const GoalsTracking = () => {
   const [periodFilter, setPeriodFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [autoRecalculating, setAutoRecalculating] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalGoals, setTotalGoals] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  
+  // Background job state
+  const [backgroundJob, setBackgroundJob] = useState(null);
+  const [jobProgress, setJobProgress] = useState(0);
+
+  // Note: We now use the context's fetchGoals function instead of our own pagination function
 
   useEffect(() => {
     const initializeGoals = async () => {
+      // Use context's fetchGoals instead of our own pagination function
       await fetchGoals();
+      
       // Auto-recalculate goals when page loads (only for managers)
       if (user?.role === 'manager') {
         setAutoRecalculating(true);
         try {
           await recalculateProgress();
-  
+
           // Refresh goals after recalculation to show updated data
           await fetchGoals();
         } catch (error) {
@@ -503,18 +517,64 @@ const GoalsTracking = () => {
               </span>
             )}
           </p>
+          
+          {/* Background Job Status */}
+          {backgroundJob && (
+            <div className={`mt-2 p-3 rounded-lg border ${
+              backgroundJob.status === 'completed' ? 'bg-green-50 border-green-200 text-green-800' :
+              backgroundJob.status === 'failed' ? 'bg-red-50 border-red-200 text-red-800' :
+              'bg-blue-50 border-blue-200 text-blue-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                {backgroundJob.status === 'completed' ? '✅' :
+                 backgroundJob.status === 'failed' ? '❌' : '🔄'}
+                <span className="text-sm font-medium">{backgroundJob.message}</span>
+              </div>
+              {backgroundJob.status === 'queued' && (
+                <div className="mt-2">
+                  <Progress value={jobProgress} className="h-2" />
+                  <p className="text-xs mt-1">Processing in background...</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {/* Action Buttons - Stacked on Mobile, Horizontal on Larger Screens */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
             variant="outline"
-            onClick={() => {
+            onClick={async () => {
               console.log('🔄 Manual refresh button clicked!');
-              fetchGoals();
+              try {
+                setAutoRecalculating(true);
+                setBackgroundJob({ status: 'queued', message: 'Queuing recalculation...' });
+                
+                await recalculateProgress();
+                
+                // Refresh goals to show updated progress
+                await fetchGoals();
+                
+                setBackgroundJob({ status: 'completed', message: 'Recalculation completed!' });
+                setTimeout(() => setBackgroundJob(null), 3000);
+              } catch (error) {
+                console.error('❌ Recalculation failed:', error);
+                setBackgroundJob({ status: 'failed', message: 'Recalculation failed' });
+                setTimeout(() => setBackgroundJob(null), 5000);
+              } finally {
+                setAutoRecalculating(false);
+              }
             }}
+            disabled={autoRecalculating}
             className="w-full sm:w-auto justify-center sm:justify-start"
           >
-            🔄 Refresh Goals
+            {autoRecalculating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                Processing...
+              </>
+            ) : (
+              '🔄 Refresh Goals'
+            )}
           </Button>
           
           <Dialog open={showForm} onOpenChange={setShowForm}>
@@ -604,7 +664,11 @@ const GoalsTracking = () => {
           <div className="flex items-center justify-between">
             <CardTitle>My Goals</CardTitle>
             <div className="flex items-center gap-4">
-              <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <Select value={periodFilter} onValueChange={(value) => {
+                setPeriodFilter(value);
+                setCurrentPage(1); // Reset to first page when filter changes
+                fetchGoals(); // Use context's fetchGoals
+              }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -618,7 +682,11 @@ const GoalsTracking = () => {
                 </SelectContent>
               </Select>
               
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setCurrentPage(1); // Reset to first page when filter changes
+                fetchGoals(); // Use context's fetchGoals
+              }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -778,6 +846,88 @@ const GoalsTracking = () => {
               </div>
             )}
           </div>
+          
+          {/* Pagination Controls */}
+          {totalGoals > itemsPerPage && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalGoals)} of {totalGoals} goals</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="items-per-page" className="text-sm">Show:</Label>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                    setItemsPerPage(parseInt(value));
+                    setCurrentPage(1); // Reset to first page
+                    fetchGoals(); // Use context's fetchGoals
+                  }}>
+                    <SelectTrigger id="items-per-page" className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Page navigation */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage - 1;
+                      setCurrentPage(newPage);
+                      fetchGoals(); // Use context's fetchGoals
+                    }}
+                    disabled={currentPage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (pageNum > totalPages) return null;
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setCurrentPage(pageNum);
+                            fetchGoals(); // Use context's fetchGoals
+                          }}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage + 1;
+                      setCurrentPage(newPage);
+                      fetchGoals(); // Use context's fetchGoals
+                    }}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

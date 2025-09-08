@@ -322,3 +322,5 @@ Your dashboard displays key metrics and insights:
 - **Set Goal**: Goals → Create New Goal
 - **View Reports**: Reports → Generate Report
 - **Manage Team**: Team → View Members
+
+

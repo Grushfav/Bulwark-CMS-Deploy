@@ -1,0 +1,29 @@
+
+# Plesk Deployment Instructions
+
+## Frontend Files Ready!
+The frontend has been built and prepared for Plesk deployment.
+
+## Upload Instructions:
+1. Upload all files from 'plesk-build/' directory to your Plesk 'public_html/' directory
+2. Make sure .htaccess file is uploaded (for Apache configuration)
+3. Verify file permissions (644 for files, 755 for directories)
+
+## Backend Setup:
+1. Upload backend files to a subdirectory like 'api/' or 'backend/'
+2. Configure Node.js application in Plesk
+3. Set up PostgreSQL database
+4. Update environment variables
+
+## Configuration:
+- Frontend is configured to use production API URL
+- Make sure to update config.js with your actual domain
+- SSL certificates should be installed for HTTPS
+
+## Testing:
+1. Visit your domain to test frontend
+2. Test API endpoints
+3. Verify authentication works
+4. Check role-based access control
+
+Happy deployment! 🚀

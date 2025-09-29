@@ -10,6 +10,7 @@ import fs from 'fs';
 import { contentUpload, getIsS3Enabled, getS3PublicUrl } from '../config/multer.js';
 import B2 from 'backblaze-b2';
 import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
 
 const router = express.Router();
 
@@ -733,7 +734,7 @@ router.get('/content/:id/download', authenticateToken, async (req, res) => {
       });
     }
 
-    // If filePath is a public URL (B2/S3/CDN), redirect to it
+    // If filePath is a public URL (B2/S3/CDN), proxy it to avoid browser CORS
     if (/^https?:\/\//i.test(item.filePath)) {
       await db.update(content)
         .set({ 
@@ -742,7 +743,68 @@ router.get('/content/:id/download', authenticateToken, async (req, res) => {
         })
         .where(eq(content.id, contentId));
 
-      return res.redirect(302, item.filePath);
+      // Build best-effort list of candidate URLs
+      const bucketName = process.env.B2_BUCKET_NAME || process.env.B2_BUCKET;
+      let dynamicBase = process.env.B2_DOWNLOAD_URL || null;
+      if (!dynamicBase && process.env.B2_KEY_ID && process.env.B2_APP_KEY) {
+        try {
+          const b2 = new B2({ applicationKeyId: process.env.B2_KEY_ID, applicationKey: process.env.B2_APP_KEY });
+          const auth = await b2.authorize();
+          if (auth?.data?.downloadUrl) dynamicBase = auth.data.downloadUrl;
+        } catch (_) {
+          // ignore, will fall back to default
+        }
+      }
+      const downloadBase = dynamicBase || 'https://f000.backblazeb2.com';
+
+      // Try stored URL, host-swapped URL, and canonical URL using bucket/key
+      const candidates = [item.filePath];
+      candidates.push(item.filePath.replace(/^https?:\/\/f\d+\.backblazeb2\.com/i, downloadBase));
+      if (bucketName) {
+        const m = item.filePath.match(/\/file\/([^/]+)\/(.+)$/);
+        const key = m && m[1] && m[2] && m[1].toLowerCase() === bucketName.toLowerCase() ? m[2] : null;
+        if (key) {
+          candidates.push(`${downloadBase}/file/${bucketName}/${key}`);
+        }
+      }
+      let lastStatus = 0;
+      for (const url of candidates) {
+        try {
+          const upstream = await fetch(url, { redirect: 'follow' });
+          if (upstream.ok && upstream.body) {
+            res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="${item.fileName}"`);
+            return Readable.fromWeb(upstream.body).pipe(res);
+          }
+          lastStatus = upstream.status;
+        } catch (e) {
+          lastStatus = 0;
+        }
+      }
+      // Final fallback: attempt authorized fetch (handles private buckets)
+      if (process.env.B2_KEY_ID && process.env.B2_APP_KEY && bucketName) {
+        try {
+          const b2 = new B2({ applicationKeyId: process.env.B2_KEY_ID, applicationKey: process.env.B2_APP_KEY });
+          const auth = await b2.authorize();
+          const authHeader = auth?.data?.authorizationToken;
+          const m = item.filePath.match(/\/file\/([^/]+)\/(.+)$/);
+          const key = m && m[2] ? m[2] : null;
+          if (auth?.data?.downloadUrl && key) {
+            const authUrl = `${auth.data.downloadUrl}/file/${bucketName}/${key}`;
+            const upstream = await fetch(authUrl, { headers: { Authorization: authHeader } });
+            if (upstream.ok && upstream.body) {
+              res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+              res.setHeader('Content-Disposition', `attachment; filename="${item.fileName}"`);
+              return Readable.fromWeb(upstream.body).pipe(res);
+            }
+            lastStatus = upstream.status;
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      console.error('Upstream file fetch failed for all candidates', { candidates, lastStatus });
+      return res.status(502).json({ error: 'Upstream file fetch failed', code: 'UPSTREAM_ERROR', status: lastStatus });
     }
 
     // Local filesystem fallback
@@ -828,7 +890,7 @@ router.get('/content/:id/preview', authenticateToken, async (req, res) => {
       });
     }
 
-    // If filePath is a public URL (B2/S3/CDN), redirect inline to it
+    // If filePath is a public URL (B2/S3/CDN), proxy inline to avoid browser CORS
     if (/^https?:\/\//i.test(item.filePath)) {
       await db.update(content)
         .set({ 
@@ -837,8 +899,68 @@ router.get('/content/:id/preview', authenticateToken, async (req, res) => {
         })
         .where(eq(content.id, contentId));
 
-      // Inline view
-      return res.redirect(302, item.filePath);
+      // Build best-effort list of candidate URLs
+      const bucketName = process.env.B2_BUCKET_NAME || process.env.B2_BUCKET;
+      let dynamicBase = process.env.B2_DOWNLOAD_URL || null;
+      if (!dynamicBase && process.env.B2_KEY_ID && process.env.B2_APP_KEY) {
+        try {
+          const b2 = new B2({ applicationKeyId: process.env.B2_KEY_ID, applicationKey: process.env.B2_APP_KEY });
+          const auth = await b2.authorize();
+          if (auth?.data?.downloadUrl) dynamicBase = auth.data.downloadUrl;
+        } catch (_) {
+          // ignore, will fall back to default
+        }
+      }
+      const downloadBase = dynamicBase || 'https://f000.backblazeb2.com';
+
+      // Try stored URL, host-swapped URL, and canonical URL using bucket/key
+      const candidates = [item.filePath];
+      candidates.push(item.filePath.replace(/^https?:\/\/f\d+\.backblazeb2\.com/i, downloadBase));
+      if (bucketName) {
+        const m = item.filePath.match(/\/file\/([^/]+)\/(.+)$/);
+        const key = m && m[1] && m[2] && m[1].toLowerCase() === bucketName.toLowerCase() ? m[2] : null;
+        if (key) {
+          candidates.push(`${downloadBase}/file/${bucketName}/${key}`);
+        }
+      }
+      let lastStatus = 0;
+      for (const url of candidates) {
+        try {
+          const upstream = await fetch(url, { redirect: 'follow' });
+          if (upstream.ok && upstream.body) {
+            res.setHeader('Content-Type', upstream.headers.get('content-type') || item.mimeType || 'application/octet-stream');
+            res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+            return Readable.fromWeb(upstream.body).pipe(res);
+          }
+          lastStatus = upstream.status;
+        } catch (e) {
+          lastStatus = 0;
+        }
+      }
+      // Final fallback: attempt authorized fetch (handles private buckets)
+      if (process.env.B2_KEY_ID && process.env.B2_APP_KEY && bucketName) {
+        try {
+          const b2 = new B2({ applicationKeyId: process.env.B2_KEY_ID, applicationKey: process.env.B2_APP_KEY });
+          const auth = await b2.authorize();
+          const authHeader = auth?.data?.authorizationToken;
+          const m = item.filePath.match(/\/file\/([^/]+)\/(.+)$/);
+          const key = m && m[2] ? m[2] : null;
+          if (auth?.data?.downloadUrl && key) {
+            const authUrl = `${auth.data.downloadUrl}/file/${bucketName}/${key}`;
+            const upstream = await fetch(authUrl, { headers: { Authorization: authHeader } });
+            if (upstream.ok && upstream.body) {
+              res.setHeader('Content-Type', upstream.headers.get('content-type') || item.mimeType || 'application/octet-stream');
+              res.setHeader('Content-Disposition', `inline; filename="${item.fileName}"`);
+              return Readable.fromWeb(upstream.body).pipe(res);
+            }
+            lastStatus = upstream.status;
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      console.error('Upstream file fetch failed for all candidates (preview)', { candidates, lastStatus });
+      return res.status(502).json({ error: 'Upstream file fetch failed', code: 'UPSTREAM_ERROR', status: lastStatus });
     }
 
     // Local filesystem fallback

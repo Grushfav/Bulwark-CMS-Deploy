@@ -106,10 +106,26 @@ const speedLimiter = slowDown({
   }
 });
 
-// Apply rate limiting to specific routes
+// Apply rate limiting with development-friendly skips
 server.use('/api/auth', authLimiter); // Stricter for auth
-server.use('/api/', generalLimiter); // General rate limiting for other routes
-server.use('/api/', speedLimiter); // Speed limiting
+
+// In development, skip limits for heavy endpoints like goals and reports
+const skipRateLimit = (req) => {
+  if (process.env.NODE_ENV === 'development') {
+    return (/^\/api\/reports/.test(req.path) || /^\/api\/goals/.test(req.path));
+  }
+  return false;
+};
+
+server.use('/api/', (req, res, next) => {
+  if (skipRateLimit(req)) return next();
+  return generalLimiter(req, res, next);
+});
+
+server.use('/api/', (req, res, next) => {
+  if (skipRateLimit(req)) return next();
+  return speedLimiter(req, res, next);
+});
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {

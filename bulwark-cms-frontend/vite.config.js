@@ -25,6 +25,11 @@ export default defineConfig({
       '.ngrok-free.app',
       '.ngrok.io'
     ],
+    hmr: {
+      protocol: "ws",
+      host: "localhost", // or your LAN IP / ngrok domain if remote
+      port: 5173
+    },
     // Proxy disabled for production - using production backend
     // proxy: {
     //   '/api': {

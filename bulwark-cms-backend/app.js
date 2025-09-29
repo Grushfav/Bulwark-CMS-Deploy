@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import clientRoutes from './routes/clients.js';
@@ -12,6 +14,9 @@ import fileRoutes from './routes/files.js';
 import productRoutes from './routes/products.js';
 import activityLogRoutes from './routes/activityLogs.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 // Middleware for parsing JSON and form data
@@ -19,7 +24,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Documentation endpoint
 app.get('/', (req, res) => {

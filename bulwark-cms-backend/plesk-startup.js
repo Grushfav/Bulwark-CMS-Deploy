@@ -5,7 +5,6 @@
  * This script handles the startup process for Plesk deployment
  */
 
-import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -24,37 +23,22 @@ const envPath = path.join(__dirname, '.env');
 if (fs.existsSync(envProdPath)) {
     console.log('📝 Using production environment file');
     fs.copyFileSync(envProdPath, envPath);
+    console.log('✅ Environment file copied to .env');
 } else {
     console.log('⚠️  Production environment file not found, using existing .env');
 }
 
-// Start the server
-const serverProcess = spawn('node', ['server.js'], {
-    cwd: __dirname,
-    stdio: 'inherit',
-    env: {
-        ...process.env,
-        NODE_ENV: 'production'
-    }
-});
+// Set production environment
+process.env.NODE_ENV = 'production';
 
-serverProcess.on('error', (error) => {
-    console.error('❌ Failed to start server:', error);
+console.log('🚀 Starting server directly...');
+
+// Import and start the server directly instead of spawning
+try {
+    // Import the server module
+    const serverModule = await import('./server.js');
+    console.log('✅ Server module loaded successfully');
+} catch (error) {
+    console.error('❌ Failed to load server module:', error);
     process.exit(1);
-});
-
-serverProcess.on('exit', (code) => {
-    console.log(`🛑 Server exited with code ${code}`);
-    process.exit(code);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('🛑 Received SIGTERM, shutting down gracefully...');
-    serverProcess.kill('SIGTERM');
-});
-
-process.on('SIGINT', () => {
-    console.log('🛑 Received SIGINT, shutting down gracefully...');
-    serverProcess.kill('SIGINT');
-});
+}

@@ -1,20 +1,18 @@
 // Configuration file using environment variables
 export const config = {
-  // Point to deployed Render backend
-  apiUrl: 'https://bulwark-cms-deploy.onrender.com/api',
+  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
   frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173',
-  environment: 'production'
+  environment: import.meta.env.VITE_ENVIRONMENT || 'production'
 };
 
 // Helper function to get current API URL
 export const getApiUrl = () => {
-  // Point to deployed Render backend
-  return 'https://bulwark-cms-deploy.onrender.com/api';
+  return config.apiUrl;
 };
 
 // Helper function to get current frontend URL
 export const getFrontendUrl = () => {
-  return config.environment;
+  return config.frontendUrl;
 };
 
 // Helper function to get current environment
@@ -24,7 +22,7 @@ export const getEnvironment = () => {
 
 // Helper function to check if we're in development
 export const isDevelopment = () => {
-  return config.environment === 'local';
+  return config.environment === 'local' || config.environment === 'development';
 };
 
 // Helper function to check if we're in production

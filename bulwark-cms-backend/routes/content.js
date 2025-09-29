@@ -7,7 +7,9 @@ import { requireManager } from '../middleware/roleCheck.js';
 import { eq, and, like, desc, asc, or, gte, lte } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs';
-import { contentUpload } from '../config/multer.js';
+import { contentUpload, getIsS3Enabled, getS3PublicUrl } from '../config/multer.js';
+import B2 from 'backblaze-b2';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -332,18 +334,55 @@ router.post('/content', authenticateToken, contentUpload.single('file'), validat
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        path: req.file.path
+        path: req.file.path,
+        key: req.file.key,
+        location: req.file.location
       });
       
-      // Store relative path for database, not absolute path
-      const relativePath = path.relative(process.cwd(), req.file.path).replace(/\\/g, '/');
-      fileInfo = {
-        filePath: relativePath,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        fileType: req.file.mimetype,
-        fileExtension: path.extname(req.file.originalname)
-      };
+      // If native B2 enabled with memory storage, upload buffer directly
+      const bucketName = process.env.B2_BUCKET_NAME || process.env.B2_BUCKET;
+      if ((process.env.FILE_STORAGE?.toLowerCase() === 'b2' || (process.env.B2_KEY_ID && process.env.B2_APP_KEY && process.env.B2_BUCKET_ID && bucketName)) && req.file && req.file.buffer) {
+        const b2 = new B2({ applicationKeyId: process.env.B2_KEY_ID, applicationKey: process.env.B2_APP_KEY });
+        await b2.authorize();
+        const { data: uploadAuth } = await b2.getUploadUrl({ bucketId: process.env.B2_BUCKET_ID });
+        const fileName = `content/${uuidv4()}-${Date.now()}${path.extname(req.file.originalname)}`;
+        await b2.uploadFile({
+          uploadUrl: uploadAuth.uploadUrl,
+          uploadAuthToken: uploadAuth.authorizationToken,
+          fileName,
+          data: req.file.buffer,
+          mime: req.file.mimetype
+        });
+        const downloadBase = process.env.B2_DOWNLOAD_URL || 'https://f000.backblazeb2.com';
+        const publicUrl = `${downloadBase}/file/${bucketName}/${fileName}`;
+        fileInfo = {
+          filePath: publicUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          fileType: req.file.mimetype,
+          fileExtension: path.extname(req.file.originalname)
+        };
+      } else if (getIsS3Enabled()) {
+        const key = req.file.key;
+        const publicUrl = req.file.location || getS3PublicUrl(key);
+        fileInfo = {
+          filePath: publicUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          fileType: req.file.mimetype,
+          fileExtension: path.extname(req.file.originalname)
+        };
+      } else {
+        // Fallback for disk storage only; guard when using memory storage (no path)
+        const relativePath = req.file.path ? path.relative(process.cwd(), req.file.path).replace(/\\/g, '/') : null;
+        fileInfo = {
+          filePath: relativePath,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          fileType: req.file.mimetype,
+          fileExtension: path.extname(req.file.originalname)
+        };
+      }
       console.log('🔍 Content creation - File uploaded:', fileInfo);
     } else {
       console.log('🔍 Content creation - No file uploaded');
@@ -687,26 +726,34 @@ router.get('/content/:id/download', authenticateToken, async (req, res) => {
       });
     }
 
-    if (!item.filePath) {
+    if (!item.filePath || /undefined\b/i.test(String(item.filePath))) {
       return res.status(404).json({
         error: 'No file associated with this content',
         code: 'NO_FILE'
       });
     }
 
-    // Handle both relative and absolute paths
+    // If filePath is a public URL (B2/S3/CDN), redirect to it
+    if (/^https?:\/\//i.test(item.filePath)) {
+      await db.update(content)
+        .set({ 
+          downloadCount: (item.downloadCount || 0) + 1,
+          updatedAt: new Date()
+        })
+        .where(eq(content.id, contentId));
+
+      return res.redirect(302, item.filePath);
+    }
+
+    // Local filesystem fallback
     let fullPath;
     if (path.isAbsolute(item.filePath)) {
       fullPath = item.filePath;
     } else {
       fullPath = path.join(process.cwd(), item.filePath);
     }
-
     if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({
-        error: 'File not found',
-        code: 'FILE_NOT_FOUND'
-      });
+      return res.status(404).json({ error: 'File not found', code: 'FILE_NOT_FOUND' });
     }
 
     // Increment download count
@@ -774,20 +821,30 @@ router.get('/content/:id/preview', authenticateToken, async (req, res) => {
       });
     }
 
-    if (!item.filePath) {
+    if (!item.filePath || /undefined\b/i.test(String(item.filePath))) {
       return res.status(404).json({
         error: 'No file associated with this content',
         code: 'NO_FILE'
       });
     }
 
-    // Check if file exists
+    // If filePath is a public URL (B2/S3/CDN), redirect inline to it
+    if (/^https?:\/\//i.test(item.filePath)) {
+      await db.update(content)
+        .set({ 
+          viewCount: (item.viewCount || 0) + 1,
+          updatedAt: new Date()
+        })
+        .where(eq(content.id, contentId));
+
+      // Inline view
+      return res.redirect(302, item.filePath);
+    }
+
+    // Local filesystem fallback
     const fullPath = path.join(process.cwd(), item.filePath);
     if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({
-        error: 'File not found on server',
-        code: 'FILE_NOT_FOUND'
-      });
+      return res.status(404).json({ error: 'File not found on server', code: 'FILE_NOT_FOUND' });
     }
 
     // Increment view count (not download count)

@@ -60,9 +60,14 @@ export const GoalsProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { user, canViewAllData, loading: authLoading } = useAuth();
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
 
   // Fetch goals with proper error handling and data formatting
-  const fetchGoals = useCallback(async () => {
+  const fetchGoals = useCallback(async (overrides = {}) => {
     // Wait for authentication to complete
     if (authLoading) {
       console.log('🔍 GoalsContext: Authentication still loading, skipping goal fetch');
@@ -75,13 +80,17 @@ export const GoalsProvider = ({ children }) => {
       return;
     }
 
+    // Apply overrides for pagination if provided
+    if (overrides.page) setPage(overrides.page);
+    if (overrides.limit) setLimit(overrides.limit);
+
     console.log('🔍 GoalsContext: Fetching goals for user:', user.id);
     setLoading(true);
     setError(null);
 
     try {
       // All users (managers and agents) now see only their own goals
-      const params = { agent_id: user?.id };
+      const params = { agent_id: user?.id, page: overrides.page || page, limit: overrides.limit || limit };
       console.log('🔍 GoalsContext: Fetching goals with params:', params);
       console.log('🔍 GoalsContext: User role:', user?.role, 'User ID:', user?.id);
       console.log('🔍 GoalsContext: All users see only their own goals');
@@ -130,6 +139,16 @@ export const GoalsProvider = ({ children }) => {
         rawGoals = [];
       }
 
+      // Capture pagination metadata if present
+      const pagination = response.data?.pagination;
+      if (pagination) {
+        setTotal(pagination.total || 0);
+        setPages(pagination.pages || 1);
+      } else {
+        setTotal(Array.isArray(response?.data?.data) ? response.data.data.length : Array.isArray(rawGoals) ? rawGoals.length : 0);
+        setPages(1);
+      }
+
       // Format each goal with proper type conversion and null checking
       const formattedGoals = rawGoals
         .filter(goal => goal && goal.id) // Filter out null/undefined goals
@@ -161,10 +180,12 @@ export const GoalsProvider = ({ children }) => {
     }
   }, [user?.id, authLoading]);
 
-  // Auto-fetch goals when user changes
+  // Auto-fetch goals only when user ID changes (not on every render)
   useEffect(() => {
-    fetchGoals();
-  }, [fetchGoals]);
+    if (user?.id && !authLoading) {
+      fetchGoals();
+    }
+  }, [user?.id, authLoading]); // Removed fetchGoals from dependencies to prevent infinite loops
 
   // Create goal with proper data formatting
   const createGoal = useCallback(async (goalData) => {
@@ -384,6 +405,10 @@ export const GoalsProvider = ({ children }) => {
     goals,
     loading,
     error,
+    page,
+    limit,
+    total,
+    pages,
     
     // Actions
     fetchGoals,
@@ -391,6 +416,8 @@ export const GoalsProvider = ({ children }) => {
     updateGoal,
     deleteGoal,
     recalculateProgress,
+    setPage,
+    setLimit,
     
     // Legacy handlers for backward compatibility
     handleSave,

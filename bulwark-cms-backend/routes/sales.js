@@ -276,7 +276,10 @@ router.get('/', authenticateToken, [
     }
 
     const { page = 1, limit = 20, startDate, endDate, status, agent_id } = req.query;
-    const offset = (page - 1) * limit;
+    const limitInt = parseInt(limit);
+    const pageInt = parseInt(page);
+    const unlimited = limitInt === 0; // Backward-compatible: limit=0 returns all
+    const offset = (pageInt - 1) * (unlimited ? 1 : limitInt);
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -371,10 +374,11 @@ router.get('/', authenticateToken, [
 
     // Get paginated results
     console.log('🔍 Executing sales query with conditions:', whereConditions);
-    const results = await query
-      .orderBy(desc(sales.saleDate))
-      .limit(parseInt(limit))
-      .offset(offset);
+    let resultsQuery = query.orderBy(desc(sales.saleDate));
+    if (!unlimited) {
+      resultsQuery = resultsQuery.limit(limitInt).offset(offset);
+    }
+    const results = await resultsQuery;
     
     console.log('🔍 Sales query results count:', results.length);
     console.log('🔍 First few sales results:', results.slice(0, 3));
@@ -382,11 +386,11 @@ router.get('/', authenticateToken, [
     res.json({
       message: 'Sales retrieved successfully',
       sales: results,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+      pagination: unlimited ? undefined : {
+        page: pageInt,
+        limit: limitInt,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / (limitInt || 1))
       }
     });
 

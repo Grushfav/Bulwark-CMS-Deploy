@@ -254,7 +254,7 @@ const GoalForm = ({ goal, onSave, onCancel }) => {
 
 const GoalsTracking = () => {
   const { user, canViewAllData } = useAuth();
-  const { goals, loading, error: contextError, fetchGoals, createGoal, updateGoal, deleteGoal, recalculateProgress, handleSave, handleEdit, handleDelete } = useGoals();
+  const { goals, loading, error: contextError, fetchGoals, createGoal, updateGoal, deleteGoal, recalculateProgress, handleSave, handleEdit, handleDelete, page, limit, total, pages, setPage, setLimit } = useGoals();
   
   const [open, setOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
@@ -265,11 +265,11 @@ const GoalsTracking = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [autoRecalculating, setAutoRecalculating] = useState(false);
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalGoals, setTotalGoals] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  // Local helpers mirror context pagination for UI rendering
+  const currentPage = page;
+  const itemsPerPage = limit;
+  const totalGoals = total;
+  const totalPages = pages;
   
   // Background job state
   const [backgroundJob, setBackgroundJob] = useState(null);
@@ -282,23 +282,15 @@ const GoalsTracking = () => {
       // Use context's fetchGoals instead of our own pagination function
       await fetchGoals();
       
-      // Auto-recalculate goals when page loads (only for managers)
-      if (user?.role === 'manager') {
-        setAutoRecalculating(true);
-        try {
-          await recalculateProgress();
-
-          // Refresh goals after recalculation to show updated data
-          await fetchGoals();
-        } catch (error) {
-          console.error('❌ Auto-recalculation failed:', error);
-        } finally {
-          setAutoRecalculating(false);
-        }
-      }
+      // Don't auto-recalculate on every load - only fetch existing data
+      // Users can manually trigger recalculation if needed
     };
-    initializeGoals();
-  }, [fetchGoals, recalculateProgress, user?.role]);
+    
+    // Only run once when component mounts or user changes
+    if (user?.id) {
+      initializeGoals();
+    }
+  }, [user?.id]); // Removed fetchGoals and recalculateProgress from dependencies
 
   useEffect(() => {
     if (user && user.role) {
@@ -666,8 +658,8 @@ const GoalsTracking = () => {
             <div className="flex items-center gap-4">
               <Select value={periodFilter} onValueChange={(value) => {
                 setPeriodFilter(value);
-                setCurrentPage(1); // Reset to first page when filter changes
-                fetchGoals(); // Use context's fetchGoals
+                setPage(1); // Reset
+                fetchGoals({ page: 1, limit });
               }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
@@ -684,8 +676,8 @@ const GoalsTracking = () => {
               
               <Select value={statusFilter} onValueChange={(value) => {
                 setStatusFilter(value);
-                setCurrentPage(1); // Reset to first page when filter changes
-                fetchGoals(); // Use context's fetchGoals
+                setPage(1);
+                fetchGoals({ page: 1, limit });
               }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
@@ -859,9 +851,10 @@ const GoalsTracking = () => {
                 <div className="flex items-center gap-2">
                   <Label htmlFor="items-per-page" className="text-sm">Show:</Label>
                   <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-                    setItemsPerPage(parseInt(value));
-                    setCurrentPage(1); // Reset to first page
-                    fetchGoals(); // Use context's fetchGoals
+                    const newLimit = parseInt(value);
+                    setLimit(newLimit);
+                    setPage(1);
+                    fetchGoals({ page: 1, limit: newLimit });
                   }}>
                     <SelectTrigger id="items-per-page" className="w-20">
                       <SelectValue />
@@ -882,8 +875,8 @@ const GoalsTracking = () => {
                     size="sm"
                     onClick={() => {
                       const newPage = currentPage - 1;
-                      setCurrentPage(newPage);
-                      fetchGoals(); // Use context's fetchGoals
+                      setPage(newPage);
+                      fetchGoals({ page: newPage, limit });
                     }}
                     disabled={currentPage <= 1}
                   >
@@ -901,8 +894,8 @@ const GoalsTracking = () => {
                           variant={pageNum === currentPage ? "default" : "outline"}
                           size="sm"
                           onClick={() => {
-                            setCurrentPage(pageNum);
-                            fetchGoals(); // Use context's fetchGoals
+                            setPage(pageNum);
+                            fetchGoals({ page: pageNum, limit });
                           }}
                           className="w-8 h-8 p-0"
                         >
@@ -917,8 +910,8 @@ const GoalsTracking = () => {
                     size="sm"
                     onClick={() => {
                       const newPage = currentPage + 1;
-                      setCurrentPage(newPage);
-                      fetchGoals(); // Use context's fetchGoals
+                      setPage(newPage);
+                      fetchGoals({ page: newPage, limit });
                     }}
                     disabled={currentPage >= totalPages}
                   >

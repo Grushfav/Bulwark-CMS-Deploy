@@ -299,6 +299,10 @@ const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote, onDeleteNo
 const ClientsManagement = () => {
   const { user, isManager } = useAuth();
   const [clients, setClients] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [filteredClients, setFilteredClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -311,7 +315,7 @@ const ClientsManagement = () => {
 
   useEffect(() => {
     loadClients();
-  }, []);
+  }, [page, limit]);
 
   // Filter clients based on search term and role-based access
   useEffect(() => {
@@ -333,7 +337,7 @@ const ClientsManagement = () => {
   const loadClients = async () => {
     try {
       // Fetch clients from API - both managers and agents get only their own clients
-      const response = await clientsAPI.getClients({ agent_id: user?.id });
+      const response = await clientsAPI.getClients({ agent_id: user?.id, page, limit });
       
       console.log('🔍 Clients API response:', response);
       console.log('🔍 Clients data structure:', response.data);
@@ -346,6 +350,14 @@ const ClientsManagement = () => {
       
       console.log('🔍 Processed clients with notes:', (await Promise.all(clientsWithNotes)).slice(0, 2));
       setClients(await Promise.all(clientsWithNotes));
+      const pagination = response.data?.pagination;
+      if (pagination) {
+        setTotal(pagination.total || 0);
+        setPages(pagination.pages || 1);
+      } else {
+        setTotal((response.data.clients || []).length);
+        setPages(1);
+      }
     } catch (error) {
       console.error('Error loading clients:', error);
       toast.error('Failed to load clients');
@@ -818,7 +830,7 @@ const ClientsManagement = () => {
       </div>
 
              {/* Clients Grid - Card-based layout similar to Sales */}
-       <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+      <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
          <CardHeader>
            <div className="flex items-center justify-between">
              <CardTitle className="text-gray-900 dark:text-white">Clients & Prospects</CardTitle>
@@ -828,6 +840,41 @@ const ClientsManagement = () => {
            </div>
          </CardHeader>
         <CardContent>
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                Prev
+              </Button>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                Page {page} {pages ? `of ${pages}` : ''}
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setPage((p) => (pages ? Math.min(pages, p + 1) : p + 1))}
+                disabled={pages ? page >= pages : clients.length < limit}
+              >
+                Next
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-300">Rows per page:</span>
+              <Select value={String(limit)} onValueChange={(v) => { setPage(1); setLimit(parseInt(v)); }}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              {total > 0 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total: {total.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
           {/* Mobile: Card View, Desktop: Table View */}
           <div className="block md:hidden">
             {/* Mobile Card View */}

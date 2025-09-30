@@ -727,6 +727,10 @@ const SaleNotesDialog = ({ sale, isOpen, onOpenChange, onSaveNote }) => {
 const SalesTracking = () => {
   const { user, isManager, canAccessAllSales } = useAuth();
   const [sales, setSales] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -746,7 +750,7 @@ const SalesTracking = () => {
       fetchSales();
       fetchProducts();
     }
-  }, [user?.id, canAccessAllSales]);
+  }, [user?.id, canAccessAllSales, page, limit]);
 
   const fetchProducts = async () => {
     try {
@@ -761,10 +765,23 @@ const SalesTracking = () => {
   const fetchSales = async () => {
     try {
       // Use role-based API endpoint with proper API configuration
-      const params = canAccessAllSales ? {} : { agent_id: user?.id };
+      const params = {
+        ...(canAccessAllSales ? {} : { agent_id: user?.id }),
+        page,
+        limit
+      };
       
       const response = await salesAPI.getSales(params);
+      const pagination = response.data?.pagination;
       setSales(response.data.sales || []);
+      if (pagination) {
+        setTotal(pagination.total || 0);
+        setPages(pagination.pages || 1);
+      } else {
+        // Fallback if backend didn't include pagination
+        setTotal((response.data.sales || []).length);
+        setPages(1);
+      }
     } catch (error) {
       setError('Failed to fetch sales');
       console.error('Error fetching sales:', error);
@@ -776,11 +793,21 @@ const SalesTracking = () => {
   const handleSave = async () => {
     setShowForm(false);
     setSelectedSale(null);
-    // Force refresh sales data
+    // Force refresh sales data (reset to first page)
     try {
-      const params = canAccessAllSales ? {} : { agent_id: user?.id };
+      setPage(1);
+      const params = {
+        ...(canAccessAllSales ? {} : { agent_id: user?.id }),
+        page: 1,
+        limit
+      };
       const response = await salesAPI.getSales(params);
+      const pagination = response.data?.pagination;
       setSales(response.data.sales || []);
+      if (pagination) {
+        setTotal(pagination.total || 0);
+        setPages(pagination.pages || 1);
+      }
       // Goal progress is updated automatically by the backend
     } catch (error) {
       console.error('Error refreshing sales:', error);
@@ -1114,6 +1141,46 @@ const SalesTracking = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Prev
+              </Button>
+              <div className="text-sm text-gray-600">
+                Page {page} {pages ? `of ${pages}` : ''}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => (pages ? Math.min(pages, p + 1) : p + 1))}
+                disabled={pages ? page >= pages : sales.length < limit}
+              >
+                Next
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Rows per page:</span>
+              <Select value={String(limit)} onValueChange={(v) => { setPage(1); setLimit(parseInt(v)); }}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              {total > 0 && (
+                <span className="text-xs text-gray-500">Total: {total.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />

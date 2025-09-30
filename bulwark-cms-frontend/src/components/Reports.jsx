@@ -189,11 +189,12 @@ const Reports = () => {
     loadInitialData();
   }, []);
 
+  // Only auto-generate reports on initial load, not on every date/agent change
   useEffect(() => {
-    if (dateRange.startDate && dateRange.endDate && isInitialized) {
+    if (dateRange.startDate && dateRange.endDate && isInitialized && !reportData.salesSummary.totalSales) {
       generateReports();
     }
-  }, [dateRange, selectedAgent, isInitialized]);
+  }, [isInitialized]); // Removed dateRange and selectedAgent from dependencies - user must click "Generate" button
 
   const loadInitialData = useCallback(async () => {
     try {

@@ -195,8 +195,11 @@ const Dashboard = () => {
       }
     };
 
-    fetchDashboardData();
-  }, [viewMode, canViewAllData, user]);
+    // Only fetch when user ID changes, not on every state change
+    if (user?.id) {
+      fetchDashboardData();
+    }
+  }, [user?.id, viewMode]); // Removed canViewAllData to prevent extra fetches
 
   // Helper functions to calculate metrics from real data
   const calculateMonthlyRevenue = (sales) => {

@@ -257,6 +257,10 @@ const ReminderForm = ({ reminder, onSave, onCancel }) => {
 const RemindersManagement = () => {
   const { user, canViewAllData } = useAuth();
   const [reminders, setReminders] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -268,14 +272,22 @@ const RemindersManagement = () => {
 
   useEffect(() => {
     fetchReminders();
-  }, []);
+  }, [page, limit]);
 
   const fetchReminders = async () => {
     try {
       // All users (managers and agents) now see only their own reminders
-      const params = { agent_id: user?.id };
+      const params = { agent_id: user?.id, page, limit };
       const response = await remindersAPI.getReminders(params);
       setReminders(response.data.reminders);
+      const pagination = response.data?.pagination;
+      if (pagination) {
+        setTotal(pagination.total || 0);
+        setPages(pagination.pages || 1);
+      } else {
+        setTotal((response.data.reminders || []).length);
+        setPages(1);
+      }
     } catch (error) {
       setError('Failed to fetch reminders');
       console.error('Error fetching reminders:', error);
@@ -459,6 +471,41 @@ const RemindersManagement = () => {
           <CardTitle>Reminder List</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                Prev
+              </Button>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                Page {page} {pages ? `of ${pages}` : ''}
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setPage((p) => (pages ? Math.min(pages, p + 1) : p + 1))}
+                disabled={pages ? page >= pages : reminders.length < limit}
+              >
+                Next
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-300">Rows per page:</span>
+              <Select value={String(limit)} onValueChange={(v) => { setPage(1); setLimit(parseInt(v)); }}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              {total > 0 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total: {total.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
           {/* Search and Filters - Improved Mobile Layout */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1 min-w-0">

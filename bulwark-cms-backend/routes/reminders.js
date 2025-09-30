@@ -51,7 +51,10 @@ router.get('/', authenticateToken, [
     }
 
     const { page = 1, limit = 20, priority, type, startDate, endDate } = req.query;
-    const offset = (page - 1) * limit;
+    const limitInt = parseInt(limit);
+    const pageInt = parseInt(page);
+    const unlimited = limitInt === 0; // allow returning all when limit=0
+    const offset = (pageInt - 1) * (unlimited ? 1 : limitInt);
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -113,10 +116,11 @@ router.get('/', authenticateToken, [
     const total = totalResult[0]?.count || 0;
 
     // Get paginated results
-    const results = await query
-      .orderBy(asc(reminders.reminderDate))
-      .limit(parseInt(limit))
-      .offset(offset);
+    let resultsQuery = query.orderBy(asc(reminders.reminderDate));
+    if (!unlimited) {
+      resultsQuery = resultsQuery.limit(limitInt).offset(offset);
+    }
+    const results = await resultsQuery;
 
     // Process results to concatenate client names
     const processedResults = results.map(reminder => ({
@@ -129,11 +133,11 @@ router.get('/', authenticateToken, [
     res.json({
       message: 'Reminders retrieved successfully',
       reminders: processedResults,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+      pagination: unlimited ? undefined : {
+        page: pageInt,
+        limit: limitInt,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / (limitInt || 1))
       }
     });
 

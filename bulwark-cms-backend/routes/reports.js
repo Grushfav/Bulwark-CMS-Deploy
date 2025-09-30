@@ -3,6 +3,7 @@ import { query, validationResult } from 'express-validator';
 import { db } from '../config/database.js';
 import { sales, clients, users, goals } from '../models/schema.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { cacheMiddleware } from '../middleware/cache.js';
 import { requireManager } from '../middleware/roleCheck.js';
 import { eq, and, desc, asc, gte, lte, sum, count, sql } from 'drizzle-orm';
 
@@ -71,7 +72,7 @@ router.get('/dashboard', authenticateToken, [
 });
 
 // GET /sales - Generate sales reports
-router.get('/sales', authenticateToken, [
+router.get('/sales', authenticateToken, cacheMiddleware(300), [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required'),
   query('agentId').optional().isInt({ min: 1 }).withMessage('Valid agent ID is required'),
@@ -285,7 +286,7 @@ router.get('/sales', authenticateToken, [
 
 
 // GET /performance - Generate performance reports
-router.get('/performance', authenticateToken, [
+router.get('/performance', authenticateToken, cacheMiddleware(300), [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required'),
   query('agentId').optional().isInt({ min: 1 }).withMessage('Valid agent ID is required')
@@ -403,7 +404,7 @@ router.get('/performance', authenticateToken, [
 });
 
 // GET /team - Generate team performance report
-router.get('/team', authenticateToken, [
+router.get('/team', authenticateToken, cacheMiddleware(300), [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required')
 ], async (req, res) => {
@@ -508,7 +509,7 @@ router.get('/team', authenticateToken, [
 });
 
 // GET /goals - Generate goal reports
-router.get('/goals', authenticateToken, [
+router.get('/goals', authenticateToken, cacheMiddleware(300), [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required'),
   query('goalType').optional().isIn(['weekly', 'monthly', 'half_yearly', 'annual']).withMessage('Valid goal type is required')
@@ -609,7 +610,7 @@ router.get('/goals', authenticateToken, [
 });
 
 // GET /comprehensive - Generate comprehensive reports for frontend
-router.get('/comprehensive', authenticateToken, [
+router.get('/comprehensive', authenticateToken, cacheMiddleware(600), [
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required'),
   query('agentId').optional().isInt({ min: 1 }).withMessage('Valid agent ID is required')

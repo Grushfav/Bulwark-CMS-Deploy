@@ -9,23 +9,53 @@ export function registerServiceWorker() {
       .then((registration) => {
         console.log('📱 Service Worker registered successfully:', registration.scope);
         
-        // Force update for local testing
+        // Ask SW to check for updates
         registration.update();
         
-        // Check for updates
+        // Detect updates and prompt user
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateNotification();
+              // Dispatch event so UI can show a toast/button
+              window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
+                detail: {
+                  update: () => {
+                    // Ask the waiting SW to activate
+                    if (registration.waiting) {
+                      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    } else if (newWorker.state === 'installed') {
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                  }
+                }
+              }));
             }
           });
+        });
+
+        // After SW takes control, reload (only after user confirms)
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
         });
       })
       .catch((error) => {
         console.error('📱 Service Worker registration failed:', error);
       });
   }
+}
+
+// Optional helper to wire a simple confirm prompt without UI libs
+export function wireDefaultUpdatePrompt() {
+  window.addEventListener('swUpdateAvailable', (e) => {
+    const shouldUpdate = window.confirm('A new version of Bulwark CMS is available. Update now?');
+    if (shouldUpdate) {
+      e.detail.update();
+    }
+  });
 }
 
 // Show update notification

@@ -653,15 +653,15 @@ const GoalsTracking = () => {
       {/* Goals List */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>My Goals</CardTitle>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="truncate">My Goals</CardTitle>
+              <div className="flex items-center gap-4 flex-wrap">
               <Select value={periodFilter} onValueChange={(value) => {
                 setPeriodFilter(value);
                 setPage(1); // Reset
                 fetchGoals({ page: 1, limit });
               }}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -679,7 +679,7 @@ const GoalsTracking = () => {
                 setPage(1);
                 fetchGoals({ page: 1, limit });
               }}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -883,7 +883,7 @@ const GoalsTracking = () => {
                     Previous
                   </Button>
                   
-                  <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap">
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
                       if (pageNum > totalPages) return null;

@@ -58,6 +58,68 @@ export function wireDefaultUpdatePrompt() {
   });
 }
 
+// ---------- PWA Install Prompt (Windows/Android via beforeinstallprompt; iOS via instructions) ----------
+
+let deferredInstallPrompt = null;
+
+export function wireDefaultInstallPrompt() {
+  // Avoid prompting if already installed
+  const isInstalled = isAppInstalled();
+  if (isInstalled) return;
+
+  // Only once per page load
+  if (sessionStorage.getItem('pwa-install-prompt-shown') === '1') return;
+
+  const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) return;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent auto mini-infobar and store the event
+    e.preventDefault();
+    deferredInstallPrompt = e;
+
+    // Dispatch an event so the app can show a custom UI instead
+    window.dispatchEvent(new CustomEvent('pwaInstallAvailable', {
+      detail: {
+        prompt: () => deferredInstallPrompt?.prompt(),
+        getOutcome: async () => {
+          if (!deferredInstallPrompt) return null;
+          const outcome = await deferredInstallPrompt.userChoice;
+          deferredInstallPrompt = null;
+          return outcome;
+        }
+      }
+    }));
+
+    // Default confirm prompt if the app doesn't handle the event
+    if (!isIOS && sessionStorage.getItem('pwa-install-prompt-shown') !== '1') {
+      sessionStorage.setItem('pwa-install-prompt-shown', '1');
+      const accept = window.confirm('Install Bulwark CMS for a better experience?');
+      if (accept) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.finally(() => {
+          deferredInstallPrompt = null;
+        });
+      }
+    }
+  });
+
+  // iOS: no beforeinstallprompt; show instructions once per session
+  if (isIOS && sessionStorage.getItem('pwa-install-prompt-shown') !== '1') {
+    sessionStorage.setItem('pwa-install-prompt-shown', '1');
+    // Basic instruction; can be replaced by a nicer banner in UI
+    alert('To install Bulwark CMS on iOS: 1) Tap the Share button in Safari, 2) Choose "Add to Home Screen".');
+  }
+
+  // Mark installed
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    sessionStorage.removeItem('pwa-install-prompt-shown');
+    console.log('📱 PWA installed');
+  });
+}
+
 // Show update notification
 function showUpdateNotification() {
   if ('Notification' in window && Notification.permission === 'granted') {

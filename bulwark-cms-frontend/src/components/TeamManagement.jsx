@@ -499,19 +499,19 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
               {firstName?.[0] || 'U'}{lastName?.[0] || 'U'}
             </div>
-            <div>
-              <CardTitle className="text-lg">
+            <div className="min-w-0">
+              <CardTitle className="text-lg truncate">
                 {firstName} {lastName}
               </CardTitle>
-              <p className="text-sm text-muted-foreground">{email}</p>
+              <p className="text-sm text-muted-foreground truncate">{email}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             <Badge className={getRoleColor(role)}>
               {role.replace('_', ' ').toUpperCase()}
             </Badge>
@@ -572,7 +572,7 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               variant="outline"
               size="sm"
               onClick={() => onViewMetrics(member)}
-              className="flex-1"
+              className="flex-1 min-w-0"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               View Metrics
@@ -581,7 +581,7 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               variant="outline"
               size="sm"
               onClick={() => onPasswordReset(member)}
-              className="flex-1"
+              className="flex-1 min-w-0"
             >
               <Lock className="h-4 w-4 mr-2" />
               Reset Password
@@ -593,7 +593,7 @@ const MemberCard = ({ member, onSuspend, onDelete, onViewMetrics, onPasswordRese
               variant="outline"
               size="sm"
               onClick={() => onSuspend(member)}
-              className="flex-1"
+              className="flex-1 min-w-0"
               disabled={statusType === 'deleted'}
               title={statusType === 'deleted' ? 'Deleted users cannot be suspended/activated from team management. Go to Profile → Users to reactivate.' : ''}
             >

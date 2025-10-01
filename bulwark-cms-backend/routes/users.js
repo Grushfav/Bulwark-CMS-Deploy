@@ -202,6 +202,167 @@ router.post('/', authenticateToken, requireManager, [
   }
 });
 
+// PUT /profile - Update current user profile (moved before /:id to prevent route conflict)
+router.put('/profile', authenticateToken, [
+  body('firstName').optional().isLength({ min: 1, max: 100 }).withMessage('First name must be between 1 and 100 characters'),
+  body('lastName').optional().isLength({ min: 1, max: 100 }).withMessage('Last name must be between 1 and 100 characters'),
+  body('phone').optional().isLength({ max: 20 }).withMessage('Phone number must be less than 20 characters'),
+  body('bio').optional().isLength({ max: 1000 }).withMessage('Bio must be less than 1000 characters'),
+  body('department').optional().isLength({ max: 100 }).withMessage('Department must be less than 100 characters'),
+  body('position').optional().isLength({ max: 100 }).withMessage('Position must be less than 100 characters'),
+  body('location').optional().isLength({ max: 100 }).withMessage('Location must be less than 100 characters'),
+  body('website').optional().isURL().withMessage('Website must be a valid URL'),
+  body('linkedin').optional().isURL().withMessage('LinkedIn must be a valid URL'),
+  body('twitter').optional().isURL().withMessage('Twitter must be a valid URL')
+], async (req, res) => {
+  try {
+    console.log('Profile update - req.user:', req.user);
+    console.log('Profile update - req.user.id:', req.user.id, 'Type:', typeof req.user.id);
+    
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.error('Profile update - Validation errors:', errors.array());
+      return res.status(400).json({
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    console.log('Profile update - userId:', userId, 'Type:', typeof userId);
+    
+    // Validate user ID
+    if (!userId || typeof userId !== 'number' || userId <= 0) {
+      console.error('Profile update - Invalid userId:', userId);
+      return res.status(400).json({
+        error: 'Invalid user ID',
+        code: 'INVALID_USER_ID'
+      });
+    }
+
+    const updateData = req.body;
+    console.log('Profile update - updateData:', updateData);
+
+    // Remove fields that shouldn't be updated by users
+    delete updateData.id;
+    delete updateData.email;
+    delete updateData.role;
+    delete updateData.isActive;
+    delete updateData.passwordHash;
+    delete updateData.createdAt;
+
+    // Map frontend field names to database field names
+    const mappedData = {};
+    
+    // Only include fields that exist in the database schema
+    if (updateData.firstName !== undefined) mappedData.firstName = updateData.firstName;
+    if (updateData.lastName !== undefined) mappedData.lastName = updateData.lastName;
+    if (updateData.phone !== undefined) mappedData.phone = updateData.phone;
+    if (updateData.bio !== undefined) mappedData.bio = updateData.bio;
+    if (updateData.department !== undefined) mappedData.department = updateData.department;
+    if (updateData.position !== undefined) mappedData.position = updateData.position;
+    
+    // Map location to city (if city field exists)
+    if (updateData.location !== undefined) mappedData.city = updateData.location;
+    
+    // Map social media fields (if they exist)
+    if (updateData.website !== undefined) mappedData.websiteUrl = updateData.website;
+    if (updateData.linkedin !== undefined) mappedData.linkedinUrl = updateData.linkedin;
+    if (updateData.twitter !== undefined) mappedData.twitterUrl = updateData.twitter;
+    
+    // Only include these if they exist in schema
+    if (updateData.timezone !== undefined) mappedData.timezone = updateData.timezone;
+    if (updateData.language !== undefined) mappedData.language = updateData.language;
+
+    console.log('Profile update - mappedData:', mappedData);
+
+    // Check if we have any data to update
+    if (Object.keys(mappedData).length === 0) {
+      console.log('Profile update - No valid fields to update');
+      return res.status(400).json({
+        error: 'No valid fields to update',
+        code: 'NO_VALID_FIELDS'
+      });
+    }
+
+    // Add updated timestamp
+    mappedData.updatedAt = new Date();
+
+    console.log('Profile update - About to update database, userId:', userId);
+
+    try {
+      const updatedUser = await db.update(users)
+        .set(mappedData)
+        .where(eq(users.id, userId))
+        .returning();
+
+      console.log('Profile update - Database update successful');
+
+      if (!updatedUser || updatedUser.length === 0) {
+        return res.status(404).json({
+          error: 'User not found',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+
+      // Map the response back to frontend format
+      const user = updatedUser[0];
+      const responseUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isActive: user.isActive,
+        phone: user.phone || '',
+        bio: user.bio || '',
+        department: user.department || '',
+        position: user.position || '',
+        location: user.city || '',
+        website: user.websiteUrl || '',
+        linkedin: user.linkedinUrl || '',
+        twitter: user.twitterUrl || '',
+        timezone: user.timezone || 'UTC',
+        language: user.language || 'en',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLogin: user.lastLogin
+      };
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: responseUser
+      });
+
+    } catch (dbError) {
+      console.error('Profile update - Database error:', dbError);
+      
+      if (dbError.message && dbError.message.includes('column') && dbError.message.includes('does not exist')) {
+        return res.status(400).json({
+          error: 'Some profile fields are not supported',
+          code: 'UNSUPPORTED_FIELDS',
+          details: 'The database schema does not support all requested fields'
+        });
+      }
+      
+      return res.status(500).json({
+        error: 'Database update failed',
+        code: 'DB_UPDATE_ERROR',
+        details: dbError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
 // PUT /:id - Update user (managers only)
 router.put('/:id', authenticateToken, requireManager, [
   body('email').optional().isEmail().withMessage('Valid email is required if provided'),
@@ -914,200 +1075,6 @@ router.get('/debug-token', authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Debug endpoint error',
       code: 'DEBUG_ERROR'
-    });
-  }
-});
-
-// PUT /profile - Update current user profile
-router.put('/profile', authenticateToken, [
-  body('firstName').optional().isLength({ min: 1, max: 100 }).withMessage('First name must be between 1 and 100 characters'),
-  body('lastName').optional().isLength({ min: 1, max: 100 }).withMessage('Last name must be between 1 and 100 characters'),
-  body('phone').optional().isLength({ max: 20 }).withMessage('Phone number must be less than 20 characters'),
-  body('bio').optional().isLength({ max: 1000 }).withMessage('Bio must be less than 1000 characters'),
-  body('department').optional().isLength({ max: 100 }).withMessage('Department must be less than 100 characters'),
-  body('position').optional().isLength({ max: 100 }).withMessage('Position must be less than 100 characters'),
-  body('location').optional().isLength({ max: 100 }).withMessage('Location must be less than 100 characters'),
-  body('website').optional().isURL().withMessage('Website must be a valid URL'),
-  body('linkedin').optional().isURL().withMessage('LinkedIn must be a valid URL'),
-  body('twitter').optional().isURL().withMessage('Twitter must be a valid URL')
-], async (req, res) => {
-  try {
-    console.log('Profile update - req.user:', req.user);
-    console.log('Profile update - req.user.id:', req.user.id, 'Type:', typeof req.user.id);
-    console.log('Profile update - req.user.id === NaN:', req.user.id === NaN);
-    console.log('Profile update - req.user.id === null:', req.user.id === null);
-    console.log('Profile update - req.user.id === undefined:', req.user.id === undefined);
-    console.log('Profile update - Number.isNaN(req.user.id):', Number.isNaN(req.user.id));
-    console.log('Profile update - Object.is(req.user.id, NaN):', Object.is(req.user.id, NaN));
-    
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.error('Profile update - Validation errors:', errors.array());
-      return res.status(400).json({
-        error: 'Validation failed',
-        code: 'VALIDATION_ERROR',
-        details: errors.array()
-      });
-    }
-
-    const userId = req.user.id;
-    console.log('Profile update - userId before validation:', userId, 'Type:', typeof userId);
-    
-    // Enhanced validation to catch NaN and invalid user IDs
-    if (!userId || isNaN(userId) || typeof userId !== 'number' || userId <= 0) {
-      console.error('Profile update - Invalid userId:', userId, 'Type:', typeof userId, 'isNaN:', isNaN(userId));
-      return res.status(400).json({
-        error: 'Invalid user ID',
-        code: 'INVALID_USER_ID',
-        details: {
-          userId: userId,
-          type: typeof userId,
-          isNaN: isNaN(userId)
-        }
-      });
-    }
-    
-    const validUserId = parseInt(userId, 10);
-    console.log('Profile update - validUserId after parseInt:', validUserId, 'Type:', typeof validUserId);
-    
-    if (isNaN(validUserId) || validUserId <= 0) {
-      console.error('Profile update - Failed to parse userId:', validUserId);
-      return res.status(400).json({
-        error: 'Invalid user ID format',
-        code: 'INVALID_USER_ID_FORMAT',
-        details: {
-          originalUserId: userId,
-          parsedUserId: validUserId
-        }
-      });
-    }
-
-    const updateData = req.body;
-    console.log('Profile update - updateData:', updateData);
-    console.log('Profile update - updateData keys:', Object.keys(updateData));
-
-    // Remove fields that shouldn't be updated by users
-    delete updateData.id;
-    delete updateData.email;
-    delete updateData.role;
-    delete updateData.isActive;
-    delete updateData.passwordHash;
-    delete updateData.createdAt;
-
-    // Map frontend field names to database field names
-    const mappedData = {};
-    
-    // Only include fields that exist in the database schema
-    if (updateData.firstName !== undefined) mappedData.firstName = updateData.firstName;
-    if (updateData.lastName !== undefined) mappedData.lastName = updateData.lastName;
-    if (updateData.phone !== undefined) mappedData.phone = updateData.phone;
-    if (updateData.bio !== undefined) mappedData.bio = updateData.bio;
-    if (updateData.department !== undefined) mappedData.department = updateData.department;
-    if (updateData.position !== undefined) mappedData.position = updateData.position;
-    
-    // Map location to city (if city field exists)
-    if (updateData.location !== undefined) mappedData.city = updateData.location;
-    
-    // Map social media fields (if they exist)
-    if (updateData.website !== undefined) mappedData.websiteUrl = updateData.website;
-    if (updateData.linkedin !== undefined) mappedData.linkedinUrl = updateData.linkedin;
-    if (updateData.twitter !== undefined) mappedData.twitterUrl = updateData.twitter;
-    
-    // Only include these if they exist in schema
-    if (updateData.timezone !== undefined) mappedData.timezone = updateData.timezone;
-    if (updateData.language !== undefined) mappedData.language = updateData.language;
-
-    console.log('Profile update - mappedData:', mappedData);
-    console.log('Profile update - mappedData keys:', Object.keys(mappedData));
-
-    // Check if we have any data to update
-    if (Object.keys(mappedData).length === 0) {
-      console.log('Profile update - No valid fields to update');
-      return res.status(400).json({
-        error: 'No valid fields to update',
-        code: 'NO_VALID_FIELDS'
-      });
-    }
-
-    // Add updated timestamp
-    mappedData.updatedAt = new Date();
-
-    console.log('Profile update - About to update database with:', mappedData);
-    console.log('Profile update - SQL WHERE condition: userId =', validUserId);
-
-    try {
-      const updatedUser = await db.update(users)
-        .set(mappedData)
-        .where(eq(users.id, validUserId))
-        .returning();
-
-      console.log('Profile update - Database update result:', updatedUser);
-
-      if (!updatedUser || updatedUser.length === 0) {
-        return res.status(404).json({
-          error: 'User not found',
-          code: 'USER_NOT_FOUND'
-        });
-      }
-
-      // Map the response back to frontend format
-      const user = updatedUser[0];
-      const responseUser = {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-        phone: user.phone || '',
-        bio: user.bio || '',
-        department: user.department || '',
-        position: user.position || '',
-        location: user.city || '', // Map from city back to location
-        website: user.websiteUrl || '', // Map from websiteUrl back to website
-        linkedin: user.linkedinUrl || '', // Map from linkedinUrl back to linkedin
-        twitter: user.twitterUrl || '', // Map from twitterUrl back to twitter
-        timezone: user.timezone || 'UTC',
-        language: user.language || 'en',
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        lastLogin: user.lastLogin
-      };
-
-      console.log('Profile update - Final response user:', responseUser);
-      console.log('Profile update - Response user keys:', Object.keys(responseUser));
-
-      res.json({
-        message: 'Profile updated successfully',
-        user: responseUser
-      });
-
-    } catch (dbError) {
-      console.error('Profile update - Database error:', dbError);
-      
-      // Check if it's a column not found error
-      if (dbError.message && dbError.message.includes('column') && dbError.message.includes('does not exist')) {
-        return res.status(400).json({
-          error: 'Some profile fields are not supported',
-          code: 'UNSUPPORTED_FIELDS',
-          details: 'The database schema does not support all requested fields'
-        });
-      }
-      
-      // Generic database error
-      return res.status(500).json({
-        error: 'Database update failed',
-        code: 'DB_UPDATE_ERROR',
-        details: dbError.message
-      });
-    }
-
-  } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
     });
   }
 });

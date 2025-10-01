@@ -719,7 +719,7 @@ const GoalsTracking = () => {
 
                 return (
                   <Card key={goal.id} className="p-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-start gap-3 mb-3">
                           {getGoalTypeIcon(goal.metricType)}
@@ -807,11 +807,12 @@ const GoalsTracking = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2 md:ml-4 self-stretch md:self-auto flex-wrap justify-end">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onEdit(goal)}
+                          className="shrink-0"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>

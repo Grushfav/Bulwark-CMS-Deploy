@@ -1,16 +1,16 @@
 // Service Worker Registration for PWA
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    // Add cache busting for local testing
-    const cacheBuster = Date.now();
-    const swUrl = `/sw.js?v=${cacheBuster}`;
+    const swUrl = `/sw.js`;
     
-    navigator.serviceWorker.register(swUrl)
+    navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
       .then((registration) => {
         console.log('📱 Service Worker registered successfully:', registration.scope);
         
-        // Ask SW to check for updates
-        registration.update();
+        // Check for updates periodically (every 60 minutes)
+        setInterval(() => {
+          registration.update();
+        }, 60 * 60 * 1000);
         
         // Detect updates and prompt user
         registration.addEventListener('updatefound', () => {

@@ -1327,6 +1327,7 @@ const CreateUserDialog = ({ open, onOpenChange, onCreateUser }) => {
     first_name: '',
     last_name: '',
     email: '',
+    password: '',
     role: 'agent',
     department: '',
     position: '',
@@ -1336,12 +1337,25 @@ const CreateUserDialog = ({ open, onOpenChange, onCreateUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await onCreateUser(formData);
-      setOpen(false);
+      // Map snake_case to camelCase for backend
+      const mappedData = {
+        firstName: formData.first_name,
+        lastName: formData.last_name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        department: formData.department,
+        position: formData.position,
+        isActive: formData.is_active
+      };
+      
+      await onCreateUser(mappedData);
+      onOpenChange(false);
       setFormData({
         first_name: '',
         last_name: '',
         email: '',
+        password: '',
         role: 'agent',
         department: '',
         position: '',
@@ -1388,6 +1402,19 @@ const CreateUserDialog = ({ open, onOpenChange, onCreateUser }) => {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="create_password">Password</Label>
+            <Input
+              id="create_password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder="Minimum 6 characters"
+              required
+              minLength={6}
             />
           </div>
           

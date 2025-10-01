@@ -855,6 +855,9 @@ router.post('/', authenticateToken, validateGoal, async (req, res) => {
     console.log('🔍 Formatted goal:', formattedGoal);
     console.log('🔍 Formatted goal ID:', formattedGoal.id);
 
+    // Clear cache for this agent to ensure fresh data
+    clearGoalCacheByMetric(agentId, [mappedMetricType]);
+
     console.log(`✅ Goal created successfully:`, formattedGoal);
 
     res.status(201).json({

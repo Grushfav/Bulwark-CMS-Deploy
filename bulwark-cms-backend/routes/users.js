@@ -1081,7 +1081,7 @@ router.get('/debug-token', authenticateToken, async (req, res) => {
 
 // POST /:id/reset-password - Reset user password (managers only)
 router.post('/:id/reset-password', authenticateToken, requireManager, [
-  body('new_password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
+  body('new_password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
 ], async (req, res) => {
   try {
     // Check validation errors
@@ -1132,6 +1132,17 @@ router.post('/:id/reset-password', authenticateToken, requireManager, [
 
     console.log('🔧 Password reset - Database update successful');
     console.log('🔧 Password reset - Updated user ID:', updatedUser[0].id);
+    
+    // Verify the password was actually updated by checking the hash
+    const verifyUser = await db.select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    
+    console.log('🔧 Password reset - Verification:');
+    console.log('  - New hash starts with:', verifyUser[0].passwordHash.substring(0, 20));
+    console.log('  - Hash length:', verifyUser[0].passwordHash.length);
+    console.log('  - Hash matches input:', verifyUser[0].passwordHash === hashedPassword);
 
     res.json({
       message: 'Password reset successfully',

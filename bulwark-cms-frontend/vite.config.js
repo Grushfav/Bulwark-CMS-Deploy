@@ -21,9 +21,7 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       '127.0.0.1',
-      '0f3f1667d9ee.ngrok-free.app',
-      '.ngrok-free.app',
-      '.ngrok.io'
+    
     ],
     hmr: {
       protocol: "ws",

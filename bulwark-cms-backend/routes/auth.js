@@ -11,13 +11,13 @@ const router = express.Router();
 
 // Validation middleware
 const validateLogin = [
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 1 }).withMessage('Password is required')
 ];
 
 const validateRegistration = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('firstName').trim().isLength({ min: 2 }).withMessage('First name is required'),
   body('lastName').trim().isLength({ min: 2 }).withMessage('Last name is required'),
   body('role').isIn(['agent', 'manager']).withMessage('Valid role is required')
@@ -26,9 +26,13 @@ const validateRegistration = [
 // POST /auth/login - User login
 router.post('/login', validateLogin, async (req, res) => {
   try {
+    console.log('🔐 Login attempt started');
+    console.log('🔐 Request body:', { email: req.body.email, passwordLength: req.body.password?.length });
+    
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('🔐 Validation failed:', errors.array());
       return res.status(400).json({
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
@@ -37,6 +41,7 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     const { email, password } = req.body;
+    console.log('🔐 Validation passed, looking up user:', email);
 
     // Find user by email
     const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -68,7 +73,12 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     // Verify password
+    console.log('🔐 Login attempt for:', email);
+    console.log('🔐 Password hash from DB:', userData.passwordHash.substring(0, 20) + '...');
+    console.log('🔐 Password hash length:', userData.passwordHash.length);
+    
     const isValidPassword = await bcrypt.compare(password, userData.passwordHash);
+    console.log('🔐 Password comparison result:', isValidPassword);
     
     if (!isValidPassword) {
       // Increment failed login attempts
@@ -368,7 +378,7 @@ router.post('/register', validateRegistration, authenticateToken, async (req, re
 // POST /auth/change-password - Change password
 router.post('/change-password', authenticateToken, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
 ], async (req, res) => {
   try {
     // Check validation errors

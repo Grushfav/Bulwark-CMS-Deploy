@@ -77,7 +77,7 @@ const ClientForm = ({ client, onSave, onCancel }) => {
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            placeholder="Optional"
+            placeholder="Required"
           />
         </div>
         <div>
@@ -86,7 +86,7 @@ const ClientForm = ({ client, onSave, onCancel }) => {
             id="phone"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            placeholder="Optional"
+            placeholder="Required"
           />
         </div>
         <div className="md:col-span-2">

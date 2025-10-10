@@ -256,9 +256,10 @@ class JobQueue {
 
   // Cleanup old jobs periodically
   startCleanupTimer() {
+    // Run cleanup every 4 hours instead of every hour to reduce noise
     setInterval(() => {
       this.addJob('cleanup_old_jobs', {}, 'low');
-    }, 60 * 60 * 1000); // Every hour
+    }, 4 * 60 * 60 * 1000); // Every 4 hours
   }
 }
 

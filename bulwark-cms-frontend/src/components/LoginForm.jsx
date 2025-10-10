@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,6 +23,17 @@ const LoginForm = () => {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
+  // Clear error when component mounts or when user starts typing
+  useEffect(() => {
+    setError('');
+  }, []);
+
+  const clearError = () => {
+    if (error) {
+      setError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -32,10 +43,13 @@ const LoginForm = () => {
     
     if (result.success) {
       toast.success('Login successful! Welcome back.');
+      // Clear form fields on successful login
+      setEmail('');
+      setPassword('');
+      setError('');
       navigate(from, { replace: true });
     } else {
       const errorMessage = result.error || 'Login failed. Please check your credentials.';
-      setError(errorMessage);
       
       // Show different toast for rate limiting
       if (result.isRateLimited) {
@@ -49,6 +63,11 @@ const LoginForm = () => {
       } else {
         toast.error(errorMessage);
       }
+      
+      // Set error state after a small delay to prevent flashing
+      setTimeout(() => {
+        setError(errorMessage);
+      }, 100);
     }
     
     setLoading(false);
@@ -98,7 +117,10 @@ const LoginForm = () => {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearError();
+                  }}
                   placeholder="Enter your email"
                   required
                   className="h-11"
@@ -112,7 +134,10 @@ const LoginForm = () => {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      clearError();
+                    }}
                     placeholder="Enter your password"
                     required
                     className="h-11 pr-10"

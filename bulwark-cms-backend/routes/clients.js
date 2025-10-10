@@ -729,7 +729,7 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
     // Parse CSV file
     fs.createReadStream(filePath)
       .pipe(csv({
-        headers: ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status', 'notes'],
+        headers: ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status'],
         skipEmptyLines: true
       }))
       .on('data', (data) => {
@@ -792,7 +792,7 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
           dateOfBirth: dateOfBirth,
           employer: data.employer ? data.employer.trim() : null,
           status: data.status && data.status.toLowerCase() === 'client' ? 'client' : 'prospect',
-          notes: data.notes ? data.notes.trim() : null
+          notes: null
         };
         
         console.log('📁 CSV Import - Processed row:', processedRow);

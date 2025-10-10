@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { 
   FileText, Download, Calendar, TrendingUp, Users, DollarSign, 
-  Target, Activity, Filter, RefreshCw, Eye, FileSpreadsheet, AlertTriangle
+  Target, Activity, Filter, RefreshCw, Eye, FileSpreadsheet, AlertTriangle, User
 } from 'lucide-react';
 import { reportsAPI, userProfileAPI, salesAPI } from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
@@ -60,6 +60,13 @@ const Reports = () => {
     toast.success(`Applied ${preset.label} date range`);
   };
   const [selectedAgent, setSelectedAgent] = useState('all');
+  
+  // For agents, automatically set selectedAgent to their own ID and disable changes
+  useEffect(() => {
+    if (user && user.role === 'agent') {
+      setSelectedAgent(user.id.toString());
+    }
+  }, [user]);
   const [reportData, setReportData] = useState({
     salesSummary: {
       totalSales: 0,
@@ -201,36 +208,20 @@ const Reports = () => {
       setLoading(true);
       setError(null);
       
-      // Simplified agent loading using comprehensive report
-      const response = await reportsAPI.getComprehensiveReport({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate
-      });
-      
-      if (response.data?.data?.agentPerformance) {
-        const agents = response.data.data.agentPerformance
-          .filter(agent => agent.id) // Only include agents with valid IDs
-          .map(agent => ({
-            id: agent.id, // Use the actual agent ID from backend
-            first_name: agent.name?.split(' ')[0] || '',
-            last_name: agent.name?.split(' ').slice(1).join(' ') || '',
-            role: 'agent',
-            fullName: agent.name || 'Unknown Agent'
+      // Load all agents from users API (same as Team View)
+      const usersResponse = await userProfileAPI.getUsers();
+      if (usersResponse.data?.users) {
+        const agents = usersResponse.data.users
+          .filter(user => user.role === 'agent' && user.isActive && !user.deletedAt)
+          .map(user => ({
+            id: user.id,
+            first_name: user.firstName || user.first_name || '',
+            last_name: user.lastName || user.last_name || '',
+            role: user.role,
+            fullName: `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim()
           }));
-        
-        // If no agents with IDs found, try to create fallback IDs
-        if (agents.length === 0) {
-          const fallbackAgents = response.data.data.agentPerformance.map((agent, index) => ({
-            id: `fallback_${index + 1}`, // Use fallback ID
-            first_name: agent.name?.split(' ')[0] || '',
-            last_name: agent.name?.split(' ').slice(1).join(' ') || '',
-            role: 'agent',
-            fullName: agent.name || 'Unknown Agent'
-          }));
-          setAgents(fallbackAgents);
-        } else {
-          setAgents(agents);
-        }
+        setAgents(agents);
+        console.log('📊 Loaded agents for reports:', agents.length);
       }
       
       // Set initialized flag to trigger initial report generation
@@ -239,32 +230,11 @@ const Reports = () => {
     } catch (error) {
       console.error('Error loading initial data:', error);
       setError('Failed to load initial data. Please try again.');
-      
-      // Fallback: try to get agents from users API
-      try {
-        const usersResponse = await userProfileAPI.getUsers();
-        if (usersResponse.data?.users) {
-          const agents = usersResponse.data.users
-            .filter(user => user.role === 'agent')
-            .map(user => ({
-              id: user.id, // Use the actual user ID from the database
-              first_name: user.firstName || user.first_name || '',
-              last_name: user.lastName || user.last_name || '',
-              role: user.role,
-              fullName: `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim()
-            }));
-          setAgents(agents);
-        }
-      } catch (fallbackError) {
-        console.error('Fallback agent loading failed:', fallbackError);
-      }
-      
-      // Even if agent loading fails, set initialized to allow manual refresh
       setIsInitialized(true);
     } finally {
       setLoading(false);
     }
-  }, [dateRange.startDate, dateRange.endDate]);
+  }, []);
 
   const exportToCSV = (data, filename) => {
     try {
@@ -591,25 +561,39 @@ const Reports = () => {
                 onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
               />
             </div>
-                <div className="sm:col-span-2 lg:col-span-1">
-              <Label htmlFor="agent">Agent</Label>
-                  <Select value={selectedAgent} onValueChange={setSelectedAgent} disabled={memoizedAgents.length === 0}>
-                <SelectTrigger>
-                      <SelectValue placeholder={memoizedAgents.length === 0 ? "Loading agents..." : "Select agent"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Agents</SelectItem>
-                      {memoizedAgents.map(agent => (
-                    <SelectItem key={agent.id} value={agent.id.toString()}>
-                          {agent.fullName || `${agent.first_name} ${agent.last_name}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-                  {memoizedAgents.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">Loading agent list...</p>
-                  )}
-            </div>
+                {/* Agent filter - only show for managers */}
+                {user?.role === 'manager' && (
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <Label htmlFor="agent">Agent</Label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent} disabled={memoizedAgents.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={memoizedAgents.length === 0 ? "Loading agents..." : "Select agent"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        {memoizedAgents.map(agent => (
+                          <SelectItem key={agent.id} value={agent.id.toString()}>
+                            {agent.fullName || `${agent.first_name} ${agent.last_name}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {memoizedAgents.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">Loading agent list...</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Agent name display for agents */}
+                {user?.role === 'agent' && (
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <Label>Viewing Data For</Label>
+                    <div className="flex items-center h-10 px-3 py-2 text-sm bg-muted rounded-md">
+                      <User className="h-4 w-4 mr-2" />
+                      {user.firstName} {user.lastName}
+                    </div>
+                  </div>
+                )}
           </div>
         </CardContent>
       </Card>

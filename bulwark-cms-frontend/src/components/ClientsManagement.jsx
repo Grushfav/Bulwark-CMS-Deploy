@@ -580,7 +580,7 @@ const ClientsManagement = () => {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status', 'notes'];
+    const headers = ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status'];
     const sampleData = [
       'John',
       'Doe',
@@ -588,8 +588,7 @@ const ClientsManagement = () => {
       '+1-555-0123',
       '1990-01-15',
       'ABC Company',
-      'prospect',
-      'Interested in life insurance'
+      'prospect'
     ];
     
     const csvContent = [

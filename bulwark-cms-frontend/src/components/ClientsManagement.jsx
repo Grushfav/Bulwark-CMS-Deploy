@@ -303,6 +303,12 @@ const ClientsManagement = () => {
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
+  const [clientStats, setClientStats] = useState({
+    totalClients: 0,
+    activeClients: 0,
+    prospects: 0,
+    thisMonth: 0
+  });
   const [filteredClients, setFilteredClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -315,6 +321,7 @@ const ClientsManagement = () => {
 
   useEffect(() => {
     loadClients();
+    loadClientStats();
   }, [page, limit]);
 
   // Filter clients based on search term and role-based access
@@ -333,6 +340,22 @@ const ClientsManagement = () => {
 
     setFilteredClients(filtered);
   }, [clients, searchTerm, user]);
+
+  // Load client statistics for the cards
+  const loadClientStats = async () => {
+    try {
+      console.log('🔍 Loading client stats for user:', user?.id);
+      const response = await clientsAPI.getClientStats({ agent_id: user?.id });
+      console.log('🔍 Client stats response:', response.data);
+      
+      if (response.data?.stats) {
+        setClientStats(response.data.stats);
+      }
+    } catch (error) {
+      console.error('Error loading client stats:', error);
+      // Don't show error toast for stats, just log it
+    }
+  };
 
   const loadClients = async () => {
     try {
@@ -454,6 +477,7 @@ const ClientsManagement = () => {
       
       // Refresh the client list to show the new/updated client
       await loadClients();
+      await loadClientStats();
     } catch (error) {
       console.error('Error saving client:', error);
       toast.error('Failed to save client');
@@ -474,6 +498,7 @@ const ClientsManagement = () => {
       
       // Refresh the client list
       await loadClients();
+      await loadClientStats();
     } catch (error) {
       console.error('Error deleting client:', error);
       toast.error('Failed to delete client');
@@ -620,6 +645,7 @@ const ClientsManagement = () => {
         
         // Reload clients to show the newly imported ones
         loadClients();
+        loadClientStats();
         
         // Show any import errors if they occurred
         if (response.data.errors && response.data.errors.length > 0) {
@@ -755,7 +781,7 @@ const ClientsManagement = () => {
             <Users className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{clients.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{clientStats.totalClients}</div>
           </CardContent>
         </Card>
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
@@ -765,7 +791,7 @@ const ClientsManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
-              {clients.filter(c => c.status === 'client').length}
+              {clientStats.activeClients}
             </div>
           </CardContent>
         </Card>
@@ -776,7 +802,7 @@ const ClientsManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {clients.filter(c => c.status === 'prospect').length}
+              {clientStats.prospects}
             </div>
           </CardContent>
         </Card>
@@ -787,43 +813,8 @@ const ClientsManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {(() => {
-                const thisMonthClients = clients.filter(c => {
-                  if (!c.createdAt) {
-                    console.log('⚠️ Client missing createdAt:', c.id, c);
-                    // Fallback: assume client was created recently if no date available
-                    // This is useful for existing data that might not have creation dates
-                    return true; // Include in this month count as fallback
-                  }
-                  try {
-                    const createdDate = new Date(c.createdAt);
-                    if (isNaN(createdDate.getTime())) {
-                      console.log('⚠️ Invalid createdAt date:', c.createdAt, 'for client:', c.id);
-                      return false;
-                    }
-                    
-                    const now = new Date();
-                    const isThisMonth = createdDate.getMonth() === now.getMonth() && 
-                                       createdDate.getFullYear() === now.getFullYear();
-                    
-                    if (isThisMonth) {
-                      console.log('✅ Client created this month:', c.id, createdDate);
-                    }
-                    
-                    return isThisMonth;
-                  } catch (error) {
-                    console.warn('Error parsing client creation date:', error, c);
-                    return false;
-                  }
-                });
-                
-                console.log(`📊 This Month calculation: ${thisMonthClients.length} clients out of ${clients.length} total`);
-                return thisMonthClients.length;
-              })()}
+              {clientStats.thisMonth}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {clients.some(c => !c.createdAt) && '⚠️ Some clients missing creation dates'}
-            </p>
           </CardContent>
         </Card>
       </div>

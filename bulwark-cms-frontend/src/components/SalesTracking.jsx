@@ -731,6 +731,12 @@ const SalesTracking = () => {
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
+  const [salesStats, setSalesStats] = useState({
+    totalSales: 0,
+    activeSales: 0,
+    totalPremium: 0,
+    totalCommission: 0
+  });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -749,8 +755,26 @@ const SalesTracking = () => {
     if (user?.id) {
       fetchSales();
       fetchProducts();
+      loadSalesStats();
     }
   }, [user?.id, canAccessAllSales, page, limit]);
+
+  // Load sales statistics for the cards
+  const loadSalesStats = async () => {
+    try {
+      console.log('🔍 Loading sales stats for user:', user?.id);
+      const params = canAccessAllSales ? {} : { agent_id: user?.id };
+      const response = await salesAPI.getSalesStats(params);
+      console.log('🔍 Sales stats response:', response.data);
+      
+      if (response.data?.stats) {
+        setSalesStats(response.data.stats);
+      }
+    } catch (error) {
+      console.error('Error loading sales stats:', error);
+      // Don't show error toast for stats, just log it
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -808,6 +832,8 @@ const SalesTracking = () => {
         setTotal(pagination.total || 0);
         setPages(pagination.pages || 1);
       }
+      // Refresh sales stats
+      loadSalesStats();
       // Goal progress is updated automatically by the backend
     } catch (error) {
       console.error('Error refreshing sales:', error);
@@ -824,6 +850,7 @@ const SalesTracking = () => {
       try {
         await salesAPI.deleteSale(saleId);
         fetchSales();
+        loadSalesStats();
         toast.success('Sale deleted successfully!');
         // Goal progress is updated automatically by the backend
 
@@ -847,6 +874,7 @@ const SalesTracking = () => {
   const handleSaveNote = () => {
     // Refresh sales data after note is saved
     fetchSales();
+    loadSalesStats();
   };
 
   const handleDownload = async () => {
@@ -963,6 +991,7 @@ const SalesTracking = () => {
         }
         
         fetchSales();
+        loadSalesStats();
         // Goal progress is updated automatically by the backend
       } else {
         toast.error('Import failed - no data received');
@@ -990,10 +1019,8 @@ const SalesTracking = () => {
     return matchesSearch && matchesStatus && matchesProduct;
   });
 
-  // Calculate totals
-  const totalPremium = sales.reduce((sum, sale) => sum + (parseFloat(sale.premiumAmount) || 0), 0);
-  const totalCommission = sales.reduce((sum, sale) => sum + (parseFloat(sale.commissionAmount) || 0), 0);
-  const activeSales = sales.filter(sale => sale.status === 'active').length;
+  // Use stats from API instead of calculating from paginated data
+  const { totalPremium, totalCommission, activeSales } = salesStats;
 
   if (loading) {
     return (

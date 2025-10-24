@@ -95,6 +95,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      console.log('🔄 Dashboard - fetchDashboardData called', { user: user?.id, viewMode });
       try {
         setError(null);
         setLoading(true);
@@ -105,23 +106,37 @@ const Dashboard = () => {
         }
         
         // Fetch data using the API service instead of direct fetch calls
-        const [salesResponse, clientsResponse, goalsResponse, remindersResponse] = await Promise.all([
+        // Use dedicated stats API for accurate client counts
+        const [salesResponse, clientStatsResponse, goalsResponse, remindersResponse] = await Promise.all([
           salesAPI.getSales(viewMode === 'overall' && canViewAllData ? {} : { agent_id: user.id }),
-          clientsAPI.getClients(viewMode === 'overall' && canViewAllData ? {} : { agent_id: user.id }),
+          clientsAPI.getClientStats(), // Get accurate client statistics
           goalsAPI.getGoals(viewMode === 'overall' && canViewAllData ? {} : { agent_id: user.id }),
           remindersAPI.getReminders(viewMode === 'overall' && canViewAllData ? {} : { agent_id: user.id })
         ]);
 
         // Extract data from responses
         const salesData = salesResponse.data.sales || salesResponse.data || [];
-        const clientsData = clientsResponse.data.clients || clientsResponse.data || [];
+        const clientStats = clientStatsResponse.data.stats || {};
         const goalsData = goalsResponse.data.data || goalsResponse.data || []; // Backend sends data.data
         const remindersData = remindersResponse.data.reminders || remindersResponse.data || [];
+        
+        console.log('🔍 Dashboard - Client Stats API response:', clientStats);
+        console.log('🔍 Dashboard - Full clientStatsResponse:', clientStatsResponse.data);
         
         // Calculate metrics from real data
         
         const totalSales = salesData.filter(sale => sale.status === 'active').length;
-        const totalClients = clientsData.length;
+        // Use dedicated stats API for accurate client counts
+        const totalClients = clientStats.totalClients || 0;
+        const activeClients = clientStats.activeClients || 0;
+        const prospects = clientStats.prospects || 0;
+        
+        console.log('🔍 Dashboard - Client statistics from API:', {
+          totalClients,
+          activeClients,
+          prospects
+        });
+        
         const activePolicies = totalSales; // Same as total sales for active policies
         const monthlyRevenue = calculateMonthlyRevenue(salesData);
         const totalPremium = calculateTotalPremium(salesData);
@@ -162,7 +177,7 @@ const Dashboard = () => {
 
         console.log('Real data fetched:', {
           sales: salesData.length,
-          clients: clientsData.length,
+          clientStats: clientStats,
           goals: goalsData.length,
           reminders: remindersData.length
         });
@@ -379,39 +394,39 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Client Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Sales"
-          value={totalSales.toLocaleString()}
-          description="Active policies"
-          icon={DollarSign}
-          trend={totalSales > 0 ? 12.5 : 0}
-          color="green"
-        />
         <StatCard
           title="Total Clients"
           value={totalClients.toLocaleString()}
-          description="Active clients"
+          description="All clients"
           icon={Users}
           trend={totalClients > 0 ? 8.2 : 0}
           color="blue"
         />
         <StatCard
-          title="Active Policies"
-          value={activePolicies.toLocaleString()}
-          description="Current policies"
-          icon={Target}
-          trend={activePolicies > 0 ? 15.3 : 0}
-          color="purple"
+          title="Active Clients"
+          value={activeClients.toLocaleString()}
+          description="Client status"
+          icon={Users}
+          trend={activeClients > 0 ? 12.5 : 0}
+          color="green"
         />
         <StatCard
-          title="Monthly Revenue"
-          value={`$${monthlyRevenue.toLocaleString()}`}
-          description="This month"
-          icon={TrendingUp}
-          trend={monthlyRevenue > 0 ? 22.1 : 0}
+          title="Prospects"
+          value={prospects.toLocaleString()}
+          description="Potential clients"
+          icon={Target}
+          trend={prospects > 0 ? 15.3 : 0}
           color="orange"
+        />
+        <StatCard
+          title="This Month"
+          value={totalClients.toLocaleString()}
+          description="Current period"
+          icon={Calendar}
+          trend={totalClients > 0 ? 22.1 : 0}
+          color="purple"
         />
       </div>
 

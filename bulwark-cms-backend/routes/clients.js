@@ -59,6 +59,91 @@ const validateClientNote = [
   body('noteType').optional().isIn(['general', 'follow_up', 'policy', 'important']).withMessage('Valid note type is required')
 ];
 
+// GET /clients/stats - Get client statistics (must come before /:id route)
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { agent_id } = req.query; // Optional agent_id for filtering
+    
+    console.log('📊 Client Stats API - Starting...', { userId, userRole, agent_id });
+    
+    // Build where conditions for role-based access
+    let whereConditions = [];
+    
+    if (userRole === 'agent') {
+      // Agents can only see their own data
+      whereConditions.push(eq(clients.agentId, userId));
+      console.log('📊 Client Stats API - Agent filter applied:', { agentId: userId });
+    } else if (userRole === 'manager' && agent_id) {
+      // Manager viewing specific agent's data
+      whereConditions.push(eq(clients.agentId, parseInt(agent_id)));
+      console.log('📊 Client Stats API - Manager viewing agent data:', { agentId: agent_id });
+    } else if (userRole === 'manager') {
+      // Manager viewing all data (no filter)
+      console.log('📊 Client Stats API - Manager viewing all data');
+    }
+    
+    // Get total clients count
+    let totalClientsQuery = db.select({ count: count(clients.id) }).from(clients);
+    if (whereConditions.length > 0) {
+      totalClientsQuery = totalClientsQuery.where(and(...whereConditions));
+    }
+    const totalClientsResult = await totalClientsQuery;
+    const totalClients = totalClientsResult[0]?.count || 0;
+    
+    // Get active clients count (status = 'client' or 'active')
+    let activeClientsQuery = db.select({ count: count(clients.id) }).from(clients);
+    if (whereConditions.length > 0) {
+      activeClientsQuery = activeClientsQuery.where(and(
+        or(eq(clients.status, 'client'), eq(clients.status, 'active')),
+        ...whereConditions
+      ));
+    } else {
+      activeClientsQuery = activeClientsQuery.where(
+        or(eq(clients.status, 'client'), eq(clients.status, 'active'))
+      );
+    }
+    const activeClientsResult = await activeClientsQuery;
+    const activeClients = activeClientsResult[0]?.count || 0;
+    
+    // Get prospects count (status = 'prospect')
+    let prospectsQuery = db.select({ count: count(clients.id) }).from(clients);
+    if (whereConditions.length > 0) {
+      prospectsQuery = prospectsQuery.where(and(
+        eq(clients.status, 'prospect'),
+        ...whereConditions
+      ));
+    } else {
+      prospectsQuery = prospectsQuery.where(eq(clients.status, 'prospect'));
+    }
+    const prospectsResult = await prospectsQuery;
+    const prospects = prospectsResult[0]?.count || 0;
+    
+    const response = {
+      message: 'Client statistics retrieved successfully',
+      stats: {
+        totalClients,
+        activeClients,
+        prospects,
+        thisMonth: totalClients
+      }
+    };
+    
+    console.log('📊 Client Stats API - Success:', response);
+    res.json(response);
+    
+  } catch (error) {
+    console.error('📊 Client Stats API - Error:', error);
+    console.error('📊 Client Stats API - Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      details: error.message
+    });
+  }
+});
+
 // Debug endpoint to check user permissions and client access
 router.get('/debug', authenticateToken, async (req, res) => {
   try {
@@ -729,8 +814,8 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
     // Parse CSV file
     fs.createReadStream(filePath)
       .pipe(csv({
-        headers: ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status'],
-        skipEmptyLines: true
+        skipEmptyLines: true,
+        mapHeaders: ({ header }) => header.trim().toLowerCase()
       }))
       .on('data', (data) => {
         console.log('📁 CSV Import - Parsing row:', data);
@@ -742,13 +827,13 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
         }
         
         // Skip header row if it's being processed as data
-        if (data.firstName === 'firstName' && data.lastName === 'lastName') {
+        if (data.firstname === 'firstname' && data.lastname === 'lastname') {
           console.log('📁 CSV Import - Skipping header row');
           return;
         }
         
         // Validate required fields
-        if (!data.firstName || !data.lastName) {
+        if (!data.firstname || !data.lastname) {
           errors.push({
             row: results.length + 1,
             error: 'First name and last name are required'
@@ -766,33 +851,32 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
         }
 
         // Validate status if provided
-        if (data.status && !['client', 'prospect'].includes(data.status.toLowerCase())) {
+        if (data.status && !['client', 'prospect', 'active'].includes(data.status.toLowerCase())) {
           errors.push({
             row: results.length + 1,
-            error: 'Status must be either "client" or "prospect"'
+            error: 'Status must be either "client", "prospect", or "active"'
           });
           return;
         }
 
         // Parse date of birth if provided
         let dateOfBirth = null;
-        if (data.dateOfBirth || data.date_of_birth) {
-          const dateStr = data.dateOfBirth || data.date_of_birth;
-          const parsedDate = new Date(dateStr);
+        if (data.dateofbirth) {
+          const parsedDate = new Date(data.dateofbirth);
           if (!isNaN(parsedDate.getTime())) {
             dateOfBirth = parsedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
           }
         }
 
         const processedRow = {
-          firstName: data.firstName.trim(),
-          lastName: data.lastName.trim(),
+          firstName: data.firstname.trim(),
+          lastName: data.lastname.trim(),
           email: data.email ? data.email.trim() : null,
           phone: data.phone ? data.phone.trim() : null,
           dateOfBirth: dateOfBirth,
           employer: data.employer ? data.employer.trim() : null,
-          status: data.status && data.status.toLowerCase() === 'client' ? 'client' : 'prospect',
-          notes: null
+          status: data.status && (data.status.toLowerCase() === 'client' || data.status.toLowerCase() === 'active') ? 'client' : 'prospect',
+          notes: data.notes ? data.notes.trim() : null
         };
         
         console.log('📁 CSV Import - Processed row:', processedRow);

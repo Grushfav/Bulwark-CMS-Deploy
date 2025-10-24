@@ -52,6 +52,8 @@ const CleanDashboard = () => {
   const [dashboardData, setDashboardData] = useState({
     totalSales: 0,
     totalClients: 0,
+    activeClients: 0,
+    prospects: 0,
     activePolicies: 0,
     monthlyRevenue: 0,
     totalPremium: 0,
@@ -94,10 +96,26 @@ const CleanDashboard = () => {
       }
       
       try {
-        clientsResponse = await clientsAPI.getClients(shouldFetchOverall ? {} : { agent_id: user.id });
+        console.log('🔍 CleanDashboard - Calling getClientStats API...');
+        console.log('🔍 CleanDashboard - View mode:', viewMode, 'Should fetch overall:', shouldFetchOverall);
+        
+        // For individual view, we need to get client stats filtered by user
+        // For overall view, we get all client stats
+        if (shouldFetchOverall) {
+          // Manager viewing overall - get all client stats
+          clientsResponse = await clientsAPI.getClientStats();
+        } else {
+          // Individual view - get client stats for current user only
+          // Use the stats API with agent_id parameter for individual view
+          clientsResponse = await clientsAPI.getClientStats({ agent_id: user.id });
+        }
+        
+        console.log('🔍 CleanDashboard - Client Stats API response:', clientsResponse.data);
+        console.log('🔍 CleanDashboard - Stats object:', clientsResponse.data.stats);
       } catch (error) {
-        console.error('❌ Clients API failed:', error);
-        clientsResponse = { data: { clients: [] } };
+        console.error('❌ Client Stats API failed:', error);
+        console.error('❌ Error details:', error.response?.data || error.message);
+        clientsResponse = { data: { stats: { totalClients: 0, activeClients: 0, prospects: 0 } } };
       }
       
       try {
@@ -105,23 +123,30 @@ const CleanDashboard = () => {
       } catch (error) {
         console.error('❌ Goals API failed:', error);
         goalsResponse = { data: { goals: [] } };
-
-            }
+      }
 
       // Extract data from responses
       const salesData = salesResponse.data;
-      const clientsData = clientsResponse.data;
+      const clientStats = clientsResponse.data.stats || {};
       const goalsData = goalsResponse.data;
       
 
 
       // Calculate metrics
       const sales = salesData.sales || [];
-      const clients = clientsData.clients || [];
       const goals = goalsData.data || goalsData.goals || []; // Try both structures
 
       const totalSales = sales.filter(sale => sale.status === 'active').length;
-      const totalClients = clients.length;
+      const totalClients = clientStats.totalClients || 0;
+      const activeClients = clientStats.activeClients || 0;
+      const prospects = clientStats.prospects || 0;
+      
+      console.log('🔍 CleanDashboard - Calculated values:', {
+        totalClients,
+        activeClients,
+        prospects,
+        clientStats
+      });
       const activePolicies = totalSales;
       const monthlyRevenue = calculateMonthlyRevenue(sales);
       const totalPremium = calculateTotalPremium(sales);
@@ -188,6 +213,8 @@ const CleanDashboard = () => {
       const dashboardDataToSet = {
         totalSales,
         totalClients,
+        activeClients,
+        prospects,
         activePolicies,
         monthlyRevenue,
         totalPremium,
@@ -199,6 +226,7 @@ const CleanDashboard = () => {
       };
       
 
+      console.log('🔍 CleanDashboard - Setting dashboard data:', dashboardDataToSet);
       setDashboardData(dashboardDataToSet);
 
     } catch (error) {
@@ -395,6 +423,7 @@ const CleanDashboard = () => {
           icon={Users}
           description="Active clients & prospects"
         />
+        {console.log('🔍 CleanDashboard - Rendering Total Clients:', dashboardData.totalClients)}
         <StatCard
           title="Monthly Revenue"
           value={dashboardData.monthlyRevenue}

@@ -70,6 +70,10 @@ export const clientsAPI = {
     const queryString = new URLSearchParams(params).toString();
     return api.get(`/clients${queryString ? `?${queryString}` : ''}`);
   },
+  getClientStats: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/clients/stats${queryString ? `?${queryString}` : ''}`);
+  },
   createClient: (clientData) => api.post('/clients', clientData),
   getClient: (id) => api.get(`/clients/${id}`),
   updateClient: (id, clientData) => api.put(`/clients/${id}`, clientData),
@@ -100,6 +104,10 @@ export const salesAPI = {
   getSales: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return api.get(`/sales${queryString ? `?${queryString}` : ''}`);
+  },
+  getSalesStats: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/sales/stats${queryString ? `?${queryString}` : ''}`);
   },
   createSale: (saleData) => api.post('/sales', saleData),
   getSale: (id) => api.get(`/sales/${id}`),

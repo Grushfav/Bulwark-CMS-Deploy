@@ -13,6 +13,106 @@ import path from 'path';
 
 const router = express.Router();
 
+// GET /sales/stats - Get sales statistics (must come before /:id route)
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { agent_id } = req.query; // Optional agent_id for filtering
+    
+    console.log('📊 Sales Stats API - Starting...', { userId, userRole, agent_id });
+    
+    // Build where conditions for role-based access
+    let whereConditions = [];
+    
+    if (userRole === 'agent') {
+      // Agents can only see their own data
+      whereConditions.push(eq(sales.agentId, userId));
+      console.log('📊 Sales Stats API - Agent filter applied:', { agentId: userId });
+    } else if (userRole === 'manager' && agent_id) {
+      // Manager viewing specific agent's data
+      whereConditions.push(eq(sales.agentId, parseInt(agent_id)));
+      console.log('📊 Sales Stats API - Manager viewing agent data:', { agentId: agent_id });
+    } else if (userRole === 'manager') {
+      // Manager viewing all data (no filter)
+      console.log('📊 Sales Stats API - Manager viewing all data');
+    }
+    
+    // Get total sales count
+    let totalSalesQuery = db.select({ count: count(sales.id) }).from(sales);
+    if (whereConditions.length > 0) {
+      totalSalesQuery = totalSalesQuery.where(and(...whereConditions));
+    }
+    const totalSalesResult = await totalSalesQuery;
+    const totalSales = totalSalesResult[0]?.count || 0;
+    
+    // Get active sales count
+    let activeSalesQuery = db.select({ count: count(sales.id) }).from(sales);
+    if (whereConditions.length > 0) {
+      activeSalesQuery = activeSalesQuery.where(and(
+        eq(sales.status, 'active'),
+        ...whereConditions
+      ));
+    } else {
+      activeSalesQuery = activeSalesQuery.where(eq(sales.status, 'active'));
+    }
+    const activeSalesResult = await activeSalesQuery;
+    const activeSales = activeSalesResult[0]?.count || 0;
+    
+    // Get total premium amount
+    let totalPremiumQuery = db.select({ 
+      total: sum(sales.premiumAmount) 
+    }).from(sales);
+    if (whereConditions.length > 0) {
+      totalPremiumQuery = totalPremiumQuery.where(and(
+        eq(sales.status, 'active'),
+        ...whereConditions
+      ));
+    } else {
+      totalPremiumQuery = totalPremiumQuery.where(eq(sales.status, 'active'));
+    }
+    const totalPremiumResult = await totalPremiumQuery;
+    const totalPremium = parseFloat(totalPremiumResult[0]?.total || 0);
+    
+    // Get total commission amount
+    let totalCommissionQuery = db.select({ 
+      total: sum(sales.commissionAmount) 
+    }).from(sales);
+    if (whereConditions.length > 0) {
+      totalCommissionQuery = totalCommissionQuery.where(and(
+        eq(sales.status, 'active'),
+        ...whereConditions
+      ));
+    } else {
+      totalCommissionQuery = totalCommissionQuery.where(eq(sales.status, 'active'));
+    }
+    const totalCommissionResult = await totalCommissionQuery;
+    const totalCommission = parseFloat(totalCommissionResult[0]?.total || 0);
+    
+    const response = {
+      message: 'Sales statistics retrieved successfully',
+      stats: {
+        totalSales,
+        activeSales,
+        totalPremium,
+        totalCommission
+      }
+    };
+    
+    console.log('📊 Sales Stats API - Success:', response);
+    res.json(response);
+    
+  } catch (error) {
+    console.error('📊 Sales Stats API - Error:', error);
+    console.error('📊 Sales Stats API - Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      details: error.message
+    });
+  }
+});
+
 // Function to update goal progress when a sale is created
 const updateGoalProgress = async (agentId, saleData) => {
   try {

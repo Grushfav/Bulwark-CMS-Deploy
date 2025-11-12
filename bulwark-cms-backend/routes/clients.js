@@ -552,10 +552,12 @@ router.put('/:id', authenticateToken, validateClient, async (req, res) => {
   }
 });
 
-// DELETE /clients/:id - Delete client
-router.delete('/:id', authenticateToken, requireManager, async (req, res) => {
+// DELETE /clients/:id - Delete client (agents can delete their own clients)
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const clientId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
 
     // Check if client exists
     const existingClient = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
@@ -567,6 +569,19 @@ router.delete('/:id', authenticateToken, requireManager, async (req, res) => {
       });
     }
 
+    const clientRecord = existingClient[0];
+
+    // Authorization: managers can delete any client; agents only their own
+    const isManager = userRole === 'manager';
+    const isOwnerAgent = clientRecord.agentId === userId;
+
+    if (!isManager && !isOwnerAgent) {
+      return res.status(403).json({
+        error: 'Insufficient permissions to delete this client',
+        code: 'CLIENT_DELETE_FORBIDDEN'
+      });
+    }
+
     // Delete related records first (in order of dependencies)
     await db.delete(clientNotes).where(eq(clientNotes.clientId, clientId));
     await db.delete(reminders).where(eq(reminders.clientId, clientId));
@@ -574,15 +589,15 @@ router.delete('/:id', authenticateToken, requireManager, async (req, res) => {
 
     // Log the client deletion activity before deleting
     await ActivityLogger.logClientActivity(
-      req.user.id,
+      userId,
       'deleted',
       clientId,
       {
-        clientName: `${existingClient[0].firstName} ${existingClient[0].lastName}`,
-        email: existingClient[0].email,
-        status: existingClient[0].status
+        clientName: `${clientRecord.firstName} ${clientRecord.lastName}`,
+        email: clientRecord.email,
+        status: clientRecord.status
       },
-      existingClient[0],
+      clientRecord,
       null,
       req
     );

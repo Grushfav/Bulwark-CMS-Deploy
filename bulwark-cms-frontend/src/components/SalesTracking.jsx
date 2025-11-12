@@ -1020,7 +1020,7 @@ const SalesTracking = () => {
   });
 
   // Use stats from API instead of calculating from paginated data
-  const { totalPremium, totalCommission, activeSales } = salesStats;
+  const { totalSales, totalPremium, totalCommission, activeSales } = salesStats;
 
   if (loading) {
     return (
@@ -1125,7 +1125,7 @@ const SalesTracking = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{activeSales}</div>
+            <div className="text-xl sm:text-2xl font-bold">{totalSales}</div>
           </CardContent>
         </Card>
         <Card>

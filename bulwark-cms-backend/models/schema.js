@@ -83,6 +83,7 @@ export const clients = pgTable('clients', {
   lastName: varchar('last_name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }),
   phone: varchar('phone', { length: 20 }),
+  secondaryPhone: varchar('secondary_phone', { length: 20 }),
   dateOfBirth: date('date_of_birth'),
   employer: varchar('employer', { length: 255 }),
   status: varchar('status', { length: 20 }).notNull().default('prospect'), // 'client' or 'prospect'

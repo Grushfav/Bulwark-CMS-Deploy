@@ -51,6 +51,7 @@ const validateClient = [
   body('lastName').trim().isLength({ min: 2 }).withMessage('Last name is required'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('phone').optional().isLength({ min: 7, max: 15 }).withMessage('Phone number must be between 7 and 15 characters'),
+  body('secondaryPhone').optional().isLength({ min: 7, max: 15 }).withMessage('Secondary phone number must be between 7 and 15 characters'),
   body('status').optional().isIn(['prospect', 'client']).withMessage('Valid status is required')
 ];
 
@@ -248,6 +249,7 @@ router.get('/', authenticateToken, [
       lastName: clients.lastName,
       email: clients.email,
       phone: clients.phone,
+      secondaryPhone: clients.secondaryPhone,
       dateOfBirth: clients.dateOfBirth,
       employer: clients.employer,
       status: clients.status,
@@ -322,6 +324,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       lastName: clients.lastName,
       email: clients.email,
       phone: clients.phone,
+      secondaryPhone: clients.secondaryPhone,
       dateOfBirth: clients.dateOfBirth,
       employer: clients.employer,
       status: clients.status,
@@ -394,7 +397,7 @@ router.post('/', authenticateToken, validateClient, async (req, res) => {
       });
     }
 
-    const { firstName, lastName, email, phone, dateOfBirth, employer, status, notes } = req.body;
+    const { firstName, lastName, email, phone, secondaryPhone, dateOfBirth, employer, status, notes } = req.body;
     const agentId = req.user.id;
 
     // Check if email already exists (if provided)
@@ -415,6 +418,7 @@ router.post('/', authenticateToken, validateClient, async (req, res) => {
       lastName,
       email,
       phone,
+      secondaryPhone,
       dateOfBirth: dateOfBirth || null, // Keep as string for date field
       employer,
       status: status || 'prospect',
@@ -437,7 +441,9 @@ router.post('/', authenticateToken, validateClient, async (req, res) => {
       {
         clientName: `${firstName} ${lastName}`,
         email: email,
-        status: status || 'prospect'
+        status: status || 'prospect',
+        phone,
+        secondaryPhone
       },
       null,
       newClient[0],
@@ -474,7 +480,7 @@ router.put('/:id', authenticateToken, validateClient, async (req, res) => {
     const clientId = parseInt(req.params.id);
     const userId = req.user.id;
     const userRole = req.user.role;
-    const { firstName, lastName, email, phone, dateOfBirth, employer, status, notes } = req.body;
+    const { firstName, lastName, email, phone, secondaryPhone, dateOfBirth, employer, status, notes } = req.body;
 
     // Get client to check permissions
     const existingClient = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
@@ -514,6 +520,7 @@ router.put('/:id', authenticateToken, validateClient, async (req, res) => {
         lastName,
         email,
         phone,
+        secondaryPhone,
         dateOfBirth: dateOfBirth || null, // Keep as string for date field
         employer,
         status,
@@ -531,7 +538,9 @@ router.put('/:id', authenticateToken, validateClient, async (req, res) => {
       {
         clientName: `${firstName} ${lastName}`,
         email: email,
-        status: status
+        status: status,
+        phone,
+        secondaryPhone
       },
       clientData,
       updatedClient[0],

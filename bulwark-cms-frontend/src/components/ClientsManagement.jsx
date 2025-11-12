@@ -39,6 +39,7 @@ const ClientForm = ({ client, onSave, onCancel }) => {
     lastName: client?.lastName || '',
     email: client?.email || '',
     phone: client?.phone || '',
+    secondaryPhone: client?.secondaryPhone || '',
     employer: client?.employer || '',
     dateOfBirth: client?.dateOfBirth || '',
     status: client?.status || 'prospect'
@@ -81,12 +82,21 @@ const ClientForm = ({ client, onSave, onCancel }) => {
           />
         </div>
         <div>
-          <Label htmlFor="phone">Phone</Label>
+          <Label htmlFor="phone">Primary Phone</Label>
           <Input
             id="phone"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             placeholder="Required"
+          />
+        </div>
+        <div>
+          <Label htmlFor="secondaryPhone">Secondary Phone</Label>
+          <Input
+            id="secondaryPhone"
+            value={formData.secondaryPhone}
+            onChange={(e) => setFormData({ ...formData, secondaryPhone: e.target.value })}
+            placeholder="Optional"
           />
         </div>
         <div className="md:col-span-2">
@@ -330,7 +340,8 @@ const ClientsManagement = () => {
       client.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone?.includes(searchTerm)
+      client.phone?.includes(searchTerm) ||
+      client.secondaryPhone?.includes(searchTerm)
     );
 
     // Apply role-based access filter - both managers and agents see only their own clients
@@ -432,6 +443,7 @@ const ClientsManagement = () => {
           lastName: formData.lastName?.trim(),   // Remove trailing spaces
           email: formData.email?.trim() || null,  // Remove trailing spaces
           phone: formData.phone?.trim() || null,  // Remove trailing spaces
+          secondaryPhone: formData.secondaryPhone?.trim() || null,
           employer: formData.employer?.trim() || null, // Remove trailing spaces
           dateOfBirth: formData.dateOfBirth || null,
           status: formData.status || 'prospect',
@@ -452,6 +464,7 @@ const ClientsManagement = () => {
           lastName: formData.lastName?.trim(),   // Remove trailing spaces
           email: formData.email?.trim() || null,  // Remove trailing spaces
           phone: formData.phone?.trim() || null,  // Remove trailing spaces
+          secondaryPhone: formData.secondaryPhone?.trim() || null,
           employer: formData.employer?.trim() || null, // Remove trailing spaces
           dateOfBirth: formData.dateOfBirth || null,
           status: formData.status || 'prospect', // Map client_type to status
@@ -899,6 +912,11 @@ const ClientsManagement = () => {
                          <div className="text-sm">
                            <span className="text-gray-500 dark:text-gray-400">Phone:</span> <span className="text-gray-900 dark:text-white">{client.phone}</span>
                          </div>
+        {client.secondaryPhone && (
+          <div className="text-sm">
+            <span className="text-gray-500 dark:text-gray-400">Secondary Phone:</span> <span className="text-gray-900 dark:text-white">{client.secondaryPhone}</span>
+          </div>
+        )}
                          <div className="text-sm">
                            <span className="text-gray-500 dark:text-gray-400">Employer:</span> <span className="text-gray-900 dark:text-white">{client.employer || 'N/A'}</span>
                          </div>
@@ -1016,6 +1034,9 @@ const ClientsManagement = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">{client.email}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">{client.phone}</div>
+                          {client.secondaryPhone && (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{client.secondaryPhone}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Badge className={getClientTypeColor(client.status)}>

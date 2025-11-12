@@ -885,11 +885,33 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
 
         // Parse date of birth if provided
         let dateOfBirth = null;
-        if (data.dateofbirth) {
-          const parsedDate = new Date(data.dateofbirth);
-          if (!isNaN(parsedDate.getTime())) {
-            dateOfBirth = parsedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        const rawDob = (data.dateofbirth || data['date_of_birth'] || '').trim();
+        if (rawDob) {
+          const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
+          const usPattern = /^\d{2}[-/]\d{2}[-/]\d{4}$/;
+
+          if (isoPattern.test(rawDob)) {
+            dateOfBirth = rawDob;
+          } else if (usPattern.test(rawDob)) {
+            const parts = rawDob.split(/[-/]/);
+            const [month, day, year] = parts;
+            dateOfBirth = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          } else {
+            errors.push({
+              row: results.length + 1,
+              error: 'Invalid date of birth format. Use YYYY-MM-DD or MM-DD-YYYY'
+            });
+            return;
           }
+        }
+
+        const secondaryPhoneValue = data.secondaryphone || data['secondary_phone'];
+        if (secondaryPhoneValue && (secondaryPhoneValue.trim().length < 7 || secondaryPhoneValue.trim().length > 15)) {
+          errors.push({
+            row: results.length + 1,
+            error: 'Secondary phone number must be between 7 and 15 characters'
+          });
+          return;
         }
 
         const processedRow = {
@@ -897,6 +919,7 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
           lastName: data.lastname.trim(),
           email: data.email ? data.email.trim() : null,
           phone: data.phone ? data.phone.trim() : null,
+          secondaryPhone: secondaryPhoneValue ? secondaryPhoneValue.trim() : null,
           dateOfBirth: dateOfBirth,
           employer: data.employer ? data.employer.trim() : null,
           status: data.status && (data.status.toLowerCase() === 'client' || data.status.toLowerCase() === 'active') ? 'client' : 'prospect',

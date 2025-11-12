@@ -585,7 +585,7 @@ const ClientsManagement = () => {
 
   const exportToCSV = () => {
     const headers = [
-      'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Employer',
+      'ID', 'First Name', 'Last Name', 'Email', 'Primary Phone', 'Secondary Phone', 'Employer',
       'Date of Birth', 'Client Type', 'Created By', 'Notes Count'
     ];
 
@@ -595,6 +595,7 @@ const ClientsManagement = () => {
       client.lastName,
       client.email,
       client.phone,
+      client.secondaryPhone,
       client.employer,
       client.dateOfBirth,
       client.status,
@@ -618,12 +619,13 @@ const ClientsManagement = () => {
   };
 
   const downloadCSVTemplate = () => {
-    const headers = ['firstName', 'lastName', 'email', 'phone', 'dateOfBirth', 'employer', 'status'];
+    const headers = ['firstName', 'lastName', 'email', 'phone', 'secondaryPhone', 'dateOfBirth', 'employer', 'status'];
     const sampleData = [
       'John',
       'Doe',
       'john.doe@email.com',
       '+1-555-0123',
+      '+1-555-0456',
       '1990-01-15',
       'ABC Company',
       'prospect'
@@ -680,7 +682,28 @@ const ClientsManagement = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
+    
+    const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
+    const usPattern = /^\d{2}[-/]\d{2}[-/]\d{4}$/;
+
+    if (isoPattern.test(dateString)) {
+      const [year, month, day] = dateString.split('-');
+      return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+    }
+
+    if (usPattern.test(dateString)) {
+      const parts = dateString.split(/[-/]/);
+      const [month, day, year] = parts;
+      return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+    }
+
+    // Fallback to browser locale formatting if pattern is unknown
+    const parsed = new Date(dateString);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString();
+    }
+
+    return dateString;
   };
 
   const getClientTypeColor = (type) => {

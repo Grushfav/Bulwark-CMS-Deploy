@@ -949,31 +949,159 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
             });
           }
 
-          console.log('📁 CSV Import - Total results to insert:', results.length);
+          console.log('📁 CSV Import - Total results to process:', results.length);
           console.log('📁 CSV Import - Results:', results);
 
-          // Insert clients in batches
-          const batchSize = 100;
+          // Process clients with duplicate detection
           const insertedClients = [];
+          const updatedClients = [];
+          const skippedDuplicates = [];
+          const userId = req.user.id;
+          const userRole = req.user.role;
 
-          for (let i = 0; i < results.length; i += batchSize) {
-            const batch = results.slice(i, i + batchSize);
-            const batchData = batch.map(client => ({
-              ...client,
-              agentId: req.user.id,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            }));
-
-            console.log('📁 CSV Import - Batch data to insert:', batchData);
+          for (let i = 0; i < results.length; i++) {
+            const clientData = results[i];
+            const rowNumber = i + 1;
             
             try {
-              const inserted = await db.insert(clients).values(batchData).returning();
-              console.log('📁 CSV Import - Successfully inserted batch:', inserted);
-              insertedClients.push(...inserted);
-            } catch (insertError) {
-              console.error('📁 CSV Import - Database insert error:', insertError);
-              throw insertError;
+              // Check for existing clients with duplicate detection
+              // Priority: 1) Email match, 2) First name + Last name + Email, 3) First name + Last name + Phone (if no email), 4) First name + Last name (if no email/phone)
+              let existingClient = null;
+              
+              // Build role-based access condition
+              const accessConditions = [];
+              if (userRole === 'agent') {
+                accessConditions.push(eq(clients.agentId, userId));
+              }
+              
+              if (clientData.email) {
+                // Check by email first (most specific)
+                const emailConditions = [
+                  eq(clients.email, clientData.email),
+                  ...accessConditions
+                ];
+                
+                const emailMatches = await db.select()
+                  .from(clients)
+                  .where(and(...emailConditions))
+                  .limit(1);
+                
+                if (emailMatches && emailMatches.length > 0) {
+                  existingClient = emailMatches[0];
+                }
+              }
+              
+              // If no match by email, check by first name + last name + email combination
+              if (!existingClient && clientData.email) {
+                const nameEmailConditions = [
+                  eq(clients.firstName, clientData.firstName),
+                  eq(clients.lastName, clientData.lastName),
+                  eq(clients.email, clientData.email),
+                  ...accessConditions
+                ];
+                
+                const nameEmailMatches = await db.select()
+                  .from(clients)
+                  .where(and(...nameEmailConditions))
+                  .limit(1);
+                
+                if (nameEmailMatches && nameEmailMatches.length > 0) {
+                  existingClient = nameEmailMatches[0];
+                }
+              }
+              
+              // If still no match and no email provided, check by first name + last name + phone
+              if (!existingClient && !clientData.email && clientData.phone) {
+                const namePhoneConditions = [
+                  eq(clients.firstName, clientData.firstName),
+                  eq(clients.lastName, clientData.lastName),
+                  eq(clients.phone, clientData.phone),
+                  ...accessConditions
+                ];
+                
+                const namePhoneMatches = await db.select()
+                  .from(clients)
+                  .where(and(...namePhoneConditions))
+                  .limit(1);
+                
+                if (namePhoneMatches && namePhoneMatches.length > 0) {
+                  existingClient = namePhoneMatches[0];
+                }
+              }
+              
+              // Final fallback: if still no match and no email/phone, check by name only (least reliable)
+              if (!existingClient && !clientData.email && !clientData.phone) {
+                const nameConditions = [
+                  eq(clients.firstName, clientData.firstName),
+                  eq(clients.lastName, clientData.lastName),
+                  ...accessConditions
+                ];
+                
+                const nameMatches = await db.select()
+                  .from(clients)
+                  .where(and(...nameConditions))
+                  .limit(1);
+                
+                if (nameMatches && nameMatches.length > 0) {
+                  existingClient = nameMatches[0];
+                }
+              }
+
+              if (existingClient) {
+                // Check if user has permission to update this client
+                if (userRole !== 'manager' && existingClient.agentId !== userId) {
+                  skippedDuplicates.push({
+                    row: rowNumber,
+                    client: `${clientData.firstName} ${clientData.lastName}`,
+                    reason: 'Duplicate found but access denied',
+                    existingClientId: existingClient.id
+                  });
+                  continue;
+                }
+
+                // Update existing client
+                const updatedClient = await db.update(clients)
+                  .set({
+                    email: clientData.email || existingClient.email,
+                    phone: clientData.phone || existingClient.phone,
+                    secondaryPhone: clientData.secondaryPhone || existingClient.secondaryPhone,
+                    dateOfBirth: clientData.dateOfBirth || existingClient.dateOfBirth,
+                    employer: clientData.employer || existingClient.employer,
+                    status: clientData.status || existingClient.status,
+                    notes: clientData.notes || existingClient.notes,
+                    updatedAt: new Date()
+                  })
+                  .where(eq(clients.id, existingClient.id))
+                  .returning();
+
+                updatedClients.push({
+                  ...updatedClient[0],
+                  originalRow: rowNumber
+                });
+                
+                console.log(`📁 CSV Import - Updated existing client (row ${rowNumber}):`, updatedClient[0].id);
+              } else {
+                // Insert new client
+                const newClient = await db.insert(clients).values({
+                  ...clientData,
+                  agentId: userId,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }).returning();
+
+                insertedClients.push({
+                  ...newClient[0],
+                  originalRow: rowNumber
+                });
+                
+                console.log(`📁 CSV Import - Inserted new client (row ${rowNumber}):`, newClient[0].id);
+              }
+            } catch (rowError) {
+              console.error(`📁 CSV Import - Error processing row ${rowNumber}:`, rowError);
+              errors.push({
+                row: rowNumber,
+                error: `Failed to process: ${rowError.message}`
+              });
             }
           }
 
@@ -984,17 +1112,40 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
             'imported',
             {
               importedCount: insertedClients.length,
+              updatedCount: updatedClients.length,
+              skippedCount: skippedDuplicates.length,
               totalRows: results.length,
               fileName: req.file?.originalname || 'unknown',
-              errors: errors.length > 0 ? errors : null
+              errors: errors.length > 0 ? errors : null,
+              duplicates: skippedDuplicates.length > 0 ? skippedDuplicates : null
             },
             req
           );
 
+          // Build response message
+          let message = 'Bulk import completed successfully';
+          const parts = [];
+          if (insertedClients.length > 0) {
+            parts.push(`${insertedClients.length} new client(s) created`);
+          }
+          if (updatedClients.length > 0) {
+            parts.push(`${updatedClients.length} existing client(s) updated`);
+          }
+          if (skippedDuplicates.length > 0) {
+            parts.push(`${skippedDuplicates.length} duplicate(s) skipped`);
+          }
+          if (parts.length > 0) {
+            message += `: ${parts.join(', ')}`;
+          }
+
           res.json({
-            message: 'Bulk import completed successfully',
+            message: message,
             imported_count: insertedClients.length,
-            totalRows: results.length
+            updated_count: updatedClients.length,
+            skipped_count: skippedDuplicates.length,
+            totalRows: results.length,
+            duplicates: skippedDuplicates.length > 0 ? skippedDuplicates : undefined,
+            errors: errors.length > 0 ? errors : undefined
           });
 
         } catch (error) {

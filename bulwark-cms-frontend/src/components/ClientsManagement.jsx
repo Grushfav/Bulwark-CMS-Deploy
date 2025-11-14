@@ -654,25 +654,58 @@ const ClientsManagement = () => {
     try {
       setLoading(true);
       const response = await clientsAPI.bulkImportClients(file);
+      const data = response.data;
       
-      if (response.data.imported_count > 0) {
-        toast.success(`Successfully imported ${response.data.imported_count} clients`);
-        
-        // Reload clients to show the newly imported ones
-        loadClients();
-        loadClientStats();
-        
-        // Show any import errors if they occurred
-        if (response.data.errors && response.data.errors.length > 0) {
-          console.warn('Import completed with some errors:', response.data.errors);
-          toast.warning(`Import completed with ${response.data.errors.length} errors. Check console for details.`);
-        }
-      } else {
-        toast.warning('No clients were imported');
+      // Build summary message
+      const parts = [];
+      if (data.imported_count > 0) {
+        parts.push(`${data.imported_count} new client(s) created`);
       }
+      if (data.updated_count > 0) {
+        parts.push(`${data.updated_count} existing client(s) updated`);
+      }
+      if (data.skipped_count > 0) {
+        parts.push(`${data.skipped_count} duplicate(s) skipped`);
+      }
+      
+      if (parts.length > 0) {
+        toast.success(parts.join(', '));
+      } else {
+        toast.warning('No clients were processed');
+      }
+      
+      // Show duplicate information if any
+      if (data.duplicates && data.duplicates.length > 0) {
+        console.warn('Import skipped duplicates:', data.duplicates);
+        toast.warning(`Skipped ${data.duplicates.length} duplicate(s). Check console for details.`, {
+          duration: 5000
+        });
+      }
+      
+      // Show any import errors if they occurred
+      if (data.errors && data.errors.length > 0) {
+        console.warn('Import completed with some errors:', data.errors);
+        toast.warning(`Import completed with ${data.errors.length} error(s). Check console for details.`, {
+          duration: 5000
+        });
+      }
+      
+      // Reload clients to show the newly imported/updated ones
+      loadClients();
+      loadClientStats();
+      
     } catch (error) {
       console.error('Error importing CSV:', error);
-      toast.error('Failed to import CSV file');
+      const errorMessage = error.response?.data?.error || 'Failed to import CSV file';
+      toast.error(errorMessage);
+      
+      // Show detailed error information if available
+      if (error.response?.data?.errors) {
+        console.error('Import errors:', error.response.data.errors);
+      }
+      if (error.response?.data?.duplicates) {
+        console.warn('Skipped duplicates:', error.response.data.duplicates);
+      }
     } finally {
       setLoading(false);
       // Reset file input
@@ -794,7 +827,7 @@ const ClientsManagement = () => {
       {/* Client Count - Improved Mobile Layout */}
       <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg border border-blue-200 dark:border-blue-800">
         <p className="text-blue-800 dark:text-blue-200 text-sm sm:text-base">
-          Showing {filteredClients.length} of {clients.length} clients
+          Showing {filteredClients.length} of {total.toLocaleString()} clients
         
         </p>
         {!isManager && (
@@ -917,6 +950,9 @@ const ClientsManagement = () => {
                                                       <div>
                               <div className="font-medium text-gray-900 dark:text-white">
                                 {client.firstName} {client.lastName}
+                              </div>
+                              <div className="text-xs text-gray-400 dark:text-gray-500">
+                                ID: {client.id}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 DOB: {formatDate(client.dateOfBirth)}
@@ -1047,6 +1083,9 @@ const ClientsManagement = () => {
                                                          <div className="ml-4">
                                <div className="text-sm font-medium text-gray-900 dark:text-white">
                                  {client.firstName} {client.lastName}
+                               </div>
+                               <div className="text-xs text-gray-400 dark:text-gray-500">
+                                 ID: {client.id}
                                </div>
                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                  DOB: {formatDate(client.dateOfBirth)}

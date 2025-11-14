@@ -1093,6 +1093,7 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
       fs.createReadStream(req.file.path)
         .pipe(csv({
           headers: [
+            'clientId',
             'clientEmail',
             'productName', 
             'premiumAmount',
@@ -1112,7 +1113,7 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
           }
           
           // Skip header row if it's being processed as data
-          if (data.clientEmail === 'clientEmail' && data.productName === 'productName') {
+          if ((data.clientEmail === 'clientEmail' || data.clientId === 'clientId') && data.productName === 'productName') {
             return;
           }
           
@@ -1131,25 +1132,66 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
 
       try {
         // Validate required fields
-        if (!row.clientEmail || !row.productName || !row.premiumAmount || !row.saleDate) {
+        if ((!row.clientId && !row.clientEmail) || !row.productName || !row.premiumAmount || !row.saleDate) {
           errors.push({
             row: rowNumber,
-            error: 'Missing required fields (clientEmail, productName, premiumAmount, saleDate)'
+            error: 'Missing required fields (clientId or clientEmail, productName, premiumAmount, saleDate)'
           });
           continue;
         }
 
-        // Find client by email
-        const client = await db.select()
-          .from(clients)
-          .where(eq(clients.email, row.clientEmail))
-          .limit(1);
+        // Find client by ID (preferred) or email (fallback)
+        let client = null;
+        if (row.clientId) {
+          const clientId = parseInt(row.clientId, 10);
+          if (isNaN(clientId) || clientId < 1) {
+            errors.push({
+              row: rowNumber,
+              clientId: row.clientId,
+              error: 'Invalid client ID'
+            });
+            continue;
+          }
 
-        if (!client || client.length === 0) {
+          const clientById = await db.select()
+            .from(clients)
+            .where(eq(clients.id, clientId))
+            .limit(1);
+
+          if (clientById && clientById.length > 0) {
+            client = clientById[0];
+          } else {
+            errors.push({
+              row: rowNumber,
+              clientId: row.clientId,
+              error: 'Client not found with this ID'
+            });
+            continue;
+          }
+        } else if (row.clientEmail) {
+          const clientByEmail = await db.select()
+            .from(clients)
+            .where(eq(clients.email, row.clientEmail))
+            .limit(1);
+
+          if (clientByEmail && clientByEmail.length > 0) {
+            client = clientByEmail[0];
+          } else {
+            errors.push({
+              row: rowNumber,
+              clientEmail: row.clientEmail,
+              error: 'Client not found with this email'
+            });
+            continue;
+          }
+        }
+
+        // Verify agent access
+        if (userRole !== 'manager' && client.agentId !== userId) {
           errors.push({
             row: rowNumber,
-            clientEmail: row.clientEmail,
-            error: 'Client not found with this email'
+            clientId: client.id,
+            error: 'Access denied to this client'
           });
           continue;
         }
@@ -1203,7 +1245,7 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
         // Create sale record
         const newSale = await db.insert(sales).values({
           agentId: userId,
-          clientId: client[0].id,
+          clientId: client.id,
           productId: product[0].id,
           premiumAmount: premiumAmount.toString(),
           commissionAmount: commissionAmount.toString(),
@@ -1217,12 +1259,12 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
           updatedAt: new Date()
         }).returning();
 
-        console.log(`✅ Sale imported: ${newSale[0].id} - ${client[0].firstName} ${client[0].lastName}`);
+        console.log(`✅ Sale imported: ${newSale[0].id} - ${client.firstName} ${client.lastName}`);
         
         results.push({
           row: rowNumber,
           saleId: newSale[0].id,
-          clientName: `${client[0].firstName} ${client[0].lastName}`,
+          clientName: `${client.firstName} ${client.lastName}`,
           productName: row.productName,
           premiumAmount: premiumAmount,
           success: true

@@ -55,6 +55,7 @@ import {
 const Sidebar = ({ className = '' }) => {
   const { user, isManager } = useAuth();
   const location = useLocation();
+  const appVersion = import.meta.env.VITE_APP_VERSION || 'v0.0.0';
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -74,6 +75,9 @@ const Sidebar = ({ className = '' }) => {
         <div>
           <h1 className="text-lg font-bold bulwark-text-blue dark:text-blue-400">Bulwark CMS</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">Insurance Agency</p>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+            Version {appVersion}
+          </p>
         </div>
       </div>
 

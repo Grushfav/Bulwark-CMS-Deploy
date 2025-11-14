@@ -944,6 +944,7 @@ const SalesTracking = () => {
 
   const downloadSalesTemplate = () => {
     const headers = [
+      'clientId',
       'clientEmail',
       'productName', 
       'premiumAmount',
@@ -956,6 +957,7 @@ const SalesTracking = () => {
     ];
     
     const sampleData = [
+      '101',
       'john.doe@email.com',
       'Life Insurance Premium',
       '1500.00',

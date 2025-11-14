@@ -142,10 +142,11 @@ const ClientForm = ({ client, onSave, onCancel }) => {
   );
 };
 
-const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
+const ClientNotes = ({ client, notes = [], isLoading, onAddNote, onDeleteNote }) => {
   const [newNote, setNewNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null);
+  const noteList = notes || [];
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -169,7 +170,8 @@ const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
     if (deleteConfirmIndex === null) return;
 
     try {
-      const note = client.notes[deleteConfirmIndex];
+      const note = noteList[deleteConfirmIndex];
+      if (!note) return;
       await onDeleteNote(client.id, note.id);
       toast.success('Note deleted successfully');
     } catch (error) {
@@ -187,7 +189,7 @@ const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-                                   <h4 className="font-medium">Notes for {client.firstName} {client.lastName}</h4>
+        <h4 className="font-medium">Notes for {client.firstName} {client.lastName}</h4>
         <Button
           variant="outline"
           size="sm"
@@ -196,6 +198,10 @@ const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
           {isAddingNote ? 'Cancel' : 'Add Note'}
         </Button>
       </div>
+
+      {isLoading && (
+        <p className="text-sm text-gray-500">Loading notes...</p>
+      )}
 
       {isAddingNote && (
         <div className="space-y-2">
@@ -226,9 +232,9 @@ const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
       )}
 
       <div className="space-y-2">
-        {client.notes && client.notes.length > 0 ? (
-          client.notes.map((note, index) => (
-            <div key={index} className="relative p-3 bg-gray-50 rounded-lg border group hover:border-red-200 hover:shadow-sm transition-all duration-200">
+        {noteList && noteList.length > 0 ? (
+          noteList.map((note, index) => (
+            <div key={note.id || index} className="relative p-3 bg-gray-50 rounded-lg border group hover:border-red-200 hover:shadow-sm transition-all duration-200">
               <div className="flex items-start justify-between">
                 <div className="flex-1 pr-8">
                   <p className="text-sm text-gray-700 mb-1">{note.note}</p>
@@ -288,7 +294,7 @@ const ClientNotes = ({ client, onAddNote, onDeleteNote }) => {
   );
 };
 
-const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote, onDeleteNote }) => {
+const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote, onDeleteNote, notes, isLoading }) => {
   if (!client) return null;
 
   return (
@@ -300,7 +306,13 @@ const ClientNotesDialog = ({ client, isOpen, onOpenChange, onAddNote, onDeleteNo
             View and add notes for this client. Notes are timestamped and show who added them.
           </DialogDescription>
         </DialogHeader>
-        <ClientNotes client={client} onAddNote={onAddNote} onDeleteNote={onDeleteNote} />
+        <ClientNotes
+          client={client}
+          notes={notes}
+          isLoading={isLoading}
+          onAddNote={onAddNote}
+          onDeleteNote={onDeleteNote}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -328,6 +340,8 @@ const ClientsManagement = () => {
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [clientNotesCache, setClientNotesCache] = useState({});
+  const [notesLoadingId, setNotesLoadingId] = useState(null);
 
   useEffect(() => {
     loadClients();
@@ -377,13 +391,15 @@ const ClientsManagement = () => {
       console.log('🔍 Clients data structure:', response.data);
       console.log('🔍 First client structure:', response.data.clients?.[0]);
       
-      const clientsWithNotes = (response.data.clients || []).map(async (client) => ({
-        ...client,
-        notes: await loadClientNotes(client.id) // Load notes for each client
-      }));
+      const clientsWithMetadata = (response.data.clients || []).map((client) => {
+        const { notes, ...rest } = client;
+        return {
+          ...rest,
+          notesCount: client.notesCount ?? (notes ? notes.length : 0)
+        };
+      });
       
-      console.log('🔍 Processed clients with notes:', (await Promise.all(clientsWithNotes)).slice(0, 2));
-      setClients(await Promise.all(clientsWithNotes));
+      setClients(clientsWithMetadata);
       const pagination = response.data?.pagination;
       if (pagination) {
         setTotal(pagination.total || 0);
@@ -400,14 +416,27 @@ const ClientsManagement = () => {
     }
   };
 
-  // Load client notes from API
-  const loadClientNotes = async (clientId) => {
+  // Lazy-load notes for a client when needed
+  const ensureClientNotes = async (clientId) => {
+    if (clientNotesCache[clientId]) {
+      return clientNotesCache[clientId];
+    }
+    setNotesLoadingId(clientId);
     try {
       const response = await clientsAPI.getClientNotes(clientId);
-      return response.data.notes || [];
+      const notes = response.data.notes || [];
+      setClientNotesCache((prev) => ({ ...prev, [clientId]: notes }));
+      setClients((prev) =>
+        prev.map((client) =>
+          client.id === clientId ? { ...client, notesCount: notes.length } : client
+        )
+      );
+      return notes;
     } catch (error) {
       console.error('Error loading client notes:', error);
       return [];
+    } finally {
+      setNotesLoadingId((prev) => (prev === clientId ? null : prev));
     }
   };
 
@@ -529,25 +558,15 @@ const ClientsManagement = () => {
       // Save note to database via API
       const newNote = await saveClientNote(clientId, noteData);
 
-      // Update the client's notes in state
-      const updatedClients = clients.map(client => {
-        if (client.id === clientId) {
-          return {
-            ...client,
-            notes: [...(client.notes || []), newNote]
-          };
-        }
-        return client;
+      setClientNotesCache((prev) => {
+        const updatedNotes = [...(prev[clientId] || []), newNote];
+        setClients((current) =>
+          current.map((client) =>
+            client.id === clientId ? { ...client, notesCount: updatedNotes.length } : client
+          )
+        );
+        return { ...prev, [clientId]: updatedNotes };
       });
-      setClients(updatedClients);
-
-      // Update selectedClient to show the new note immediately
-      if (selectedClient && selectedClient.id === clientId) {
-        setSelectedClient(updatedClients.find(c => c.id === clientId));
-      }
-
-      // Clear the note input
-      // setNoteInputs(prev => ({ ...prev, [clientId]: '' })); // This state variable doesn't exist
 
     } catch (error) {
       console.error('Error adding note:', error);
@@ -560,27 +579,25 @@ const ClientsManagement = () => {
       // Delete note from database via API
       await clientsAPI.deleteClientNote(clientId, noteId);
 
-      // Update the client's notes in state
-      const updatedClients = clients.map(client => {
-        if (client.id === clientId) {
-          return {
-            ...client,
-            notes: client.notes.filter(note => note.id !== noteId)
-          };
-        }
-        return client;
+      setClientNotesCache((prev) => {
+        const updatedNotes = (prev[clientId] || []).filter(note => note.id !== noteId);
+        setClients((current) =>
+          current.map((client) =>
+            client.id === clientId ? { ...client, notesCount: updatedNotes.length } : client
+          )
+        );
+        return { ...prev, [clientId]: updatedNotes };
       });
-      setClients(updatedClients);
-
-      // Update selectedClient to reflect the deleted note immediately
-      if (selectedClient && selectedClient.id === clientId) {
-        setSelectedClient(updatedClients.find(c => c.id === clientId));
-      }
-
     } catch (error) {
       console.error('Error deleting note:', error);
       throw error; // Re-throw to let the component handle the error display
     }
+  };
+
+  const handleOpenNotesDialog = (client) => {
+    setSelectedClient(client);
+    setIsNotesDialogOpen(true);
+    ensureClientNotes(client.id);
   };
 
   const exportToCSV = () => {
@@ -600,7 +617,7 @@ const ClientsManagement = () => {
       client.dateOfBirth,
       client.status,
       client.createdBy,
-      (client.notes || []).length
+      client.notesCount ?? (clientNotesCache[client.id]?.length || 0)
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -1002,22 +1019,22 @@ const ClientsManagement = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setSelectedClient(client);
-                            setIsNotesDialogOpen(true);
-                          }}
+                          onClick={() => handleOpenNotesDialog(client)}
                           className="flex-1 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
                           <MessageSquare className="h-3 w-3 mr-1" />
                           Notes
-                          {(client.notes && client.notes.length > 0) && (
-                            <Badge 
-                              variant="secondary" 
-                              className="ml-1 h-4 w-4 p-0 text-xs flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white"
-                            >
-                              {client.notes.length}
-                            </Badge>
-                          )}
+                          {(() => {
+                            const noteCount = clientNotesCache[client.id]?.length ?? client.notesCount ?? 0;
+                            return noteCount > 0 ? (
+                              <Badge 
+                                variant="secondary" 
+                                className="ml-1 h-4 w-4 p-0 text-xs flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white"
+                              >
+                                {noteCount}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </Button>
                         <Button
                           variant="outline"
@@ -1133,22 +1150,22 @@ const ClientsManagement = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedClient(client);
-                                  setIsNotesDialogOpen(true);
-                                }}
+                              onClick={() => handleOpenNotesDialog(client)}
                                                              title={`View/Add Notes for ${client.firstName} ${client.lastName}`}
                                 className="relative border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
                                 <MessageSquare className="h-3 w-3" />
-                                {(client.notes && client.notes.length > 0) && (
+                              {(() => {
+                                const noteCount = clientNotesCache[client.id]?.length ?? client.notesCount ?? 0;
+                                return noteCount > 0 ? (
                                   <Badge 
                                     variant="secondary" 
                                     className="absolute -top-2 -right-2 h-5 w-5 p-0 text-xs flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white"
                                   >
-                                    {client.notes.length}
+                                    {noteCount}
                                   </Badge>
-                                )}
+                                ) : null;
+                              })()}
                               </Button>
                             <Button
                               variant="outline"
@@ -1246,6 +1263,8 @@ const ClientsManagement = () => {
         onOpenChange={setIsNotesDialogOpen}
         onAddNote={handleAddNote}
         onDeleteNote={handleDeleteNote}
+        notes={selectedClient ? clientNotesCache[selectedClient.id] : []}
+        isLoading={selectedClient ? notesLoadingId === selectedClient.id : false}
       />
     </div>
   );

@@ -345,8 +345,13 @@ const ClientsManagement = () => {
 
   useEffect(() => {
     loadClients();
-    loadClientStats();
   }, [page, limit]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadClientStats();
+    }
+  }, [user?.id]);
 
   // Filter clients based on search term and role-based access
   useEffect(() => {

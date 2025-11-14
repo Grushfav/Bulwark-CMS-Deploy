@@ -768,9 +768,14 @@ const SalesTracking = () => {
     if (user?.id) {
       fetchSales();
       fetchProducts();
-      loadSalesStats();
     }
   }, [user?.id, canAccessAllSales, page, limit]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadSalesStats();
+    }
+  }, [user?.id, canAccessAllSales]);
 
   // Load sales statistics for the cards
   const loadSalesStats = async () => {

@@ -1,10 +1,13 @@
 // Service Worker Registration for PWA
+let serviceWorkerRegistration = null;
+
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     const swUrl = `/sw.js`;
     
     navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
       .then((registration) => {
+        serviceWorkerRegistration = registration;
         console.log('📱 Service Worker registered successfully:', registration.scope);
         
         // Check for updates periodically (every 60 minutes)
@@ -12,24 +15,81 @@ export function registerServiceWorker() {
           registration.update();
         }, 60 * 60 * 1000);
         
+        // Check if there's already a waiting worker
+        if (registration.waiting) {
+          window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
+            detail: {
+              update: async () => {
+                console.log('📱 User confirmed update, activating new service worker');
+                try {
+                  if (registration.waiting) {
+                    console.log('📱 Found waiting worker, sending SKIP_WAITING message');
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  } else {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (reg && reg.waiting) {
+                      console.log('📱 Found waiting worker via getRegistration, sending SKIP_WAITING');
+                      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    } else {
+                      console.error('📱 No waiting service worker found - forcing reload');
+                      window.location.reload();
+                    }
+                  }
+                } catch (error) {
+                  console.error('📱 Error sending SKIP_WAITING message:', error);
+                  window.location.reload();
+                }
+              }
+            }
+          }));
+        }
+        
         // Detect updates and prompt user
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
+          if (!newWorker) return;
+          
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Dispatch event so UI can show a toast/button
-              window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
-                detail: {
-                  update: () => {
-                    // Ask the waiting SW to activate
-                    if (registration.waiting) {
-                      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    } else if (newWorker.state === 'installed') {
-                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+            console.log('📱 Service Worker state changed:', newWorker.state);
+            // When the new worker is installed and there's an active controller,
+            // it means there's an update waiting
+            if (newWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                // There's a new version available
+                console.log('📱 New service worker installed, waiting for activation');
+                window.dispatchEvent(new CustomEvent('swUpdateAvailable', {
+                  detail: {
+                    update: async () => {
+                      console.log('📱 User confirmed update, activating new service worker');
+                      try {
+                        // Always check registration.waiting first (most reliable)
+                        if (registration.waiting) {
+                          console.log('📱 Found waiting worker, sending SKIP_WAITING message');
+                          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        } else {
+                          // If no waiting worker, try to get registration again
+                          const reg = await navigator.serviceWorker.getRegistration();
+                          if (reg && reg.waiting) {
+                            console.log('📱 Found waiting worker via getRegistration, sending SKIP_WAITING');
+                            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                          } else {
+                            console.error('📱 No waiting service worker found - update may have already been applied');
+                            // Force reload as fallback
+                            window.location.reload();
+                          }
+                        }
+                      } catch (error) {
+                        console.error('📱 Error sending SKIP_WAITING message:', error);
+                        // Fallback: force reload
+                        window.location.reload();
+                      }
                     }
                   }
-                }
-              }));
+                }));
+              } else {
+                // This is the first install, not an update
+                console.log('📱 Service Worker installed for the first time');
+              }
             }
           });
         });
@@ -39,6 +99,7 @@ export function registerServiceWorker() {
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshing) return;
           refreshing = true;
+          console.log('📱 Service Worker controller changed, reloading page');
           window.location.reload();
         });
       })

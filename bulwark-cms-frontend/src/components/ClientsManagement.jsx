@@ -927,6 +927,11 @@ const ClientsManagement = () => {
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="200">200</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                  <SelectItem value="1000">1000</SelectItem>
+                  <SelectItem value="2000">2000</SelectItem>
+                  <SelectItem value="5000">5000</SelectItem>
                 </SelectContent>
               </Select>
               {total > 0 && (

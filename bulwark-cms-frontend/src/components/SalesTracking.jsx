@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { toast } from 'sonner';
 
@@ -49,11 +49,15 @@ import {
   X,
 } from 'lucide-react';
 
+const CLIENTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let cachedClientsData = [];
+let cachedClientsMeta = { cacheKey: null, expiresAt: 0 };
+
 const SaleForm = ({ sale, onSave, onCancel, products }) => {
   const { user, isManager, canAccessAllClients } = useAuth();
   const [clients, setClients] = useState([]);
-  const [filteredClients, setFilteredClients] = useState([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [debouncedClientSearchTerm, setDebouncedClientSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     clientId: sale?.client?.id?.toString() || '',
     productCode: sale?.product?.id?.toString() || '',
@@ -78,16 +82,14 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
   // Reset search when clients change
   useEffect(() => {
     setClientSearchTerm('');
-    setFilteredClients(clients);
   }, [clients]);
 
   // Reset search when editing an existing sale
   useEffect(() => {
     if (sale?.id) {
       setClientSearchTerm('');
-      setFilteredClients(clients);
     }
-  }, [sale?.id, clients]);
+  }, [sale?.id]);
 
   // Update form data when sale changes (for editing)
   useEffect(() => {
@@ -121,49 +123,62 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
     }
   }, [sale]);
 
-  const fetchClients = async () => {
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedClientSearchTerm(clientSearchTerm), 250);
+    return () => clearTimeout(handler);
+  }, [clientSearchTerm]);
+
+  const fetchClients = async (forceRefresh = false) => {
     try {
       setClientsLoading(true);
       
-      // Use role-based API endpoint for clients with proper API configuration
-      const params = canAccessAllClients ? {} : { agent_id: user?.id };
+      const cacheKey = `${canAccessAllClients ? 'all' : user?.id || 'unknown'}`;
+      const now = Date.now();
+
+      if (!forceRefresh && cachedClientsMeta.cacheKey === cacheKey && cachedClientsMeta.expiresAt > now) {
+        setClients(cachedClientsData);
+        return;
+      }
+
+      const params = {
+        ...(canAccessAllClients ? {} : { agent_id: user?.id }),
+        limit: 0 // Request all clients so they are available in the picker
+      };
       
       const response = await clientsAPI.getClients(params);
       const clientsData = response.data.clients || [];
       setClients(clientsData);
-      setFilteredClients(clientsData); // Initialize filtered clients
+      cachedClientsData = clientsData;
+      cachedClientsMeta = {
+        cacheKey,
+        expiresAt: now + CLIENTS_CACHE_TTL
+      };
     } catch (error) {
       console.error('Error fetching clients:', error);
       setClients([]);
-      setFilteredClients([]);
     } finally {
       setClientsLoading(false);
     }
   };
 
-  // Filter clients based on search term
-  const filterClients = (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setFilteredClients(clients);
-      return;
-    }
-    
-    const filtered = clients.filter(client => {
-      const searchLower = searchTerm.toLowerCase();
+  const filteredClients = useMemo(() => {
+    const searchTerm = debouncedClientSearchTerm.trim().toLowerCase();
+    if (!searchTerm) return clients;
+
+    return clients.filter(client => {
       return (
-        client.firstName?.toLowerCase().includes(searchLower) ||
-        client.lastName?.toLowerCase().includes(searchLower) ||
-        client.email?.toLowerCase().includes(searchLower) ||
-        `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchLower)
+        client.firstName?.toLowerCase().includes(searchTerm) ||
+        client.lastName?.toLowerCase().includes(searchTerm) ||
+        client.email?.toLowerCase().includes(searchTerm) ||
+        `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm) ||
+        client.id?.toString().toLowerCase().includes(searchTerm)
       );
     });
-    setFilteredClients(filtered);
-  };
+  }, [clients, debouncedClientSearchTerm]);
 
   // Handle client search input change
   const handleClientSearchChange = (value) => {
     setClientSearchTerm(value);
-    filterClients(value);
   };
 
   const handleSubmit = async (e) => {
@@ -222,7 +237,6 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
       
       // Reset search when form is submitted
       setClientSearchTerm('');
-      setFilteredClients(clients);
       onSave();
     } catch (error) {
       console.error('❌ Sale submission error:', error);
@@ -266,7 +280,7 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
   }, [formData.premiumAmount, formData.commissionRate]);
 
   // Check if form is ready to render
-  const isFormReady = clients.length > 0 && products.length > 0;
+  const isFormReady = !clientsLoading && products.length > 0;
 
   // Show loading state if data isn't ready
   if (!isFormReady) {
@@ -332,9 +346,9 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
                   <SelectItem key={client.id} value={client.id.toString()}>
                     <div className="flex flex-col">
                       <span className="font-medium">{client.firstName} {client.lastName}</span>
-                      {client.email && (
-                        <span className="text-xs text-gray-500">{client.email}</span>
-                      )}
+                      <span className="text-xs text-gray-500">
+                        {client.email || 'No email'} • ID: {client.id}
+                      </span>
                     </div>
                   </SelectItem>
                 ))
@@ -478,12 +492,11 @@ const SaleForm = ({ sale, onSave, onCancel, products }) => {
       </div>
 
              <DialogFooter>
-         <Button type="button" variant="outline" onClick={() => {
-           // Reset search when form is cancelled
-           setClientSearchTerm('');
-           setFilteredClients(clients);
-           onCancel();
-         }}>
+        <Button type="button" variant="outline" onClick={() => {
+          // Reset search when form is cancelled
+          setClientSearchTerm('');
+          onCancel();
+        }}>
            Cancel
          </Button>
          <Button type="submit" disabled={loading}>

@@ -183,7 +183,19 @@ router.get('/debug', authenticateToken, async (req, res) => {
 // GET /clients - Get all clients (filtered by user role)
 router.get('/', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('limit').optional().custom((value) => {
+    const limitInt = parseInt(value, 10);
+    if (isNaN(limitInt)) {
+      throw new Error('Limit must be a number');
+    }
+    if (limitInt === 0) {
+      return true; // 0 means "return all"
+    }
+    if (limitInt < 1 || limitInt > 100) {
+      throw new Error('Limit must be between 1 and 100, or 0 to return all clients');
+    }
+    return true;
+  }),
   query('search').optional().trim(),
   query('status').optional().isIn(['prospect', 'client']).withMessage('Valid status is required'),
   query('agent_id').optional().isInt({ min: 1 }).withMessage('Valid agent ID is required')
@@ -200,7 +212,10 @@ router.get('/', authenticateToken, [
     }
 
     const { page = 1, limit = 20, search, status, agent_id } = req.query;
-    const offset = (page - 1) * limit;
+    const pageInt = parseInt(page, 10);
+    const limitInt = parseInt(limit, 10);
+    const unlimited = limitInt === 0;
+    const offset = unlimited ? 0 : (pageInt - 1) * limitInt;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -282,10 +297,11 @@ router.get('/', authenticateToken, [
 
     // Get paginated results
     console.log('🔍 Executing final query with conditions:', whereConditions);
-    const results = await query
-      .orderBy(desc(clients.createdAt))
-      .limit(parseInt(limit))
-      .offset(offset);
+    let resultsQuery = query.orderBy(desc(clients.createdAt));
+    if (!unlimited) {
+      resultsQuery = resultsQuery.limit(limitInt).offset(offset);
+    }
+    const results = await resultsQuery;
     
     console.log('🔍 Query results count:', results.length);
     console.log('🔍 First few results:', results.slice(0, 3));
@@ -294,10 +310,10 @@ router.get('/', authenticateToken, [
       message: 'Clients retrieved successfully',
       clients: results,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageInt,
+        limit: limitInt,
         total,
-        pages: Math.ceil(total / limit)
+        pages: unlimited ? 1 : Math.ceil(total / (limitInt || 1))
       }
     });
 

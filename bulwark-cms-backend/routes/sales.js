@@ -358,7 +358,20 @@ const validateSale = [
 // GET /sales - Get all sales (filtered by user role)
 router.get('/', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('limit').optional().custom((value) => {
+    if (value === undefined) return true;
+    const limitInt = parseInt(value, 10);
+    if (isNaN(limitInt)) {
+      throw new Error('Limit must be a number');
+    }
+    if (limitInt === 0) {
+      return true; // 0 returns all records
+    }
+    if (limitInt < 1 || limitInt > 100) {
+      throw new Error('Limit must be between 1 and 100, or 0 to return all sales');
+    }
+    return true;
+  }),
   query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
   query('endDate').optional().isISO8601().withMessage('Valid end date is required'),
   query('status').optional().isIn(['active', 'cancelled', 'expired']).withMessage('Valid status is required'),
@@ -379,7 +392,7 @@ router.get('/', authenticateToken, [
     const limitInt = parseInt(limit);
     const pageInt = parseInt(page);
     const unlimited = limitInt === 0; // Backward-compatible: limit=0 returns all
-    const offset = (pageInt - 1) * (unlimited ? 1 : limitInt);
+    const offset = unlimited ? 0 : (pageInt - 1) * limitInt;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -486,6 +499,7 @@ router.get('/', authenticateToken, [
     res.json({
       message: 'Sales retrieved successfully',
       sales: results,
+      total,
       pagination: unlimited ? undefined : {
         page: pageInt,
         limit: limitInt,

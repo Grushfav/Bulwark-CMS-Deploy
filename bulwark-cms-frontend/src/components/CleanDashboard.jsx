@@ -89,7 +89,10 @@ const CleanDashboard = () => {
       let salesResponse, clientsResponse, goalsResponse;
       
       try {
-        salesResponse = await salesAPI.getSales(shouldFetchOverall ? {} : { agent_id: user.id });
+        const salesParams = shouldFetchOverall
+          ? { limit: 0 }
+          : { agent_id: user.id, limit: 0 };
+        salesResponse = await salesAPI.getSales(salesParams);
       } catch (error) {
         console.error('❌ Sales API failed:', error);
         salesResponse = { data: { sales: [] } };

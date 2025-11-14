@@ -810,13 +810,13 @@ const SalesTracking = () => {
       
       const response = await salesAPI.getSales(params);
       const pagination = response.data?.pagination;
-      setSales(response.data.sales || []);
+      const salesData = response.data.sales || [];
+      setSales(salesData);
       if (pagination) {
         setTotal(pagination.total || 0);
         setPages(pagination.pages || 1);
       } else {
-        // Fallback if backend didn't include pagination
-        setTotal((response.data.sales || []).length);
+        setTotal(response.data?.total ?? salesData.length);
         setPages(1);
       }
     } catch (error) {
@@ -840,10 +840,14 @@ const SalesTracking = () => {
       };
       const response = await salesAPI.getSales(params);
       const pagination = response.data?.pagination;
-      setSales(response.data.sales || []);
+      const salesData = response.data.sales || [];
+      setSales(salesData);
       if (pagination) {
         setTotal(pagination.total || 0);
         setPages(pagination.pages || 1);
+      } else {
+        setTotal(response.data?.total ?? salesData.length);
+        setPages(1);
       }
       // Refresh sales stats
       loadSalesStats();
@@ -895,7 +899,7 @@ const SalesTracking = () => {
       toast.info('Preparing sales data for export...');
       
       // Get user's own sales data (same as what they see on the page)
-      const response = await salesAPI.getSales({ limit: 100 });
+      const response = await salesAPI.getSales({ limit: 0 });
       const salesData = response.data?.sales || response.data || [];
       
       if (salesData.length === 0) {
@@ -1189,32 +1193,45 @@ const SalesTracking = () => {
               <Button
                 variant="outline"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
+                disabled={limit === 0 || page <= 1}
               >
                 Prev
               </Button>
               <div className="text-sm text-gray-600">
-                Page {page} {pages ? `of ${pages}` : ''}
+                {limit === 0 ? 'Showing all records' : `Page ${page} ${pages ? `of ${pages}` : ''}`}
               </div>
               <Button
                 variant="outline"
                 onClick={() => setPage((p) => (pages ? Math.min(pages, p + 1) : p + 1))}
-                disabled={pages ? page >= pages : sales.length < limit}
+                disabled={limit === 0 || (pages ? page >= pages : sales.length < limit)}
               >
                 Next
               </Button>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Rows per page:</span>
-              <Select value={String(limit)} onValueChange={(v) => { setPage(1); setLimit(parseInt(v)); }}>
+              <Select
+                value={String(limit)}
+                onValueChange={(v) => {
+                  const nextLimit = parseInt(v, 10);
+                  setPage(1);
+                  setLimit(Number.isNaN(nextLimit) ? 20 : nextLimit);
+                }}
+              >
                 <SelectTrigger className="w-24">
-                  <SelectValue />
+                  <SelectValue placeholder="Select rows" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="200">200</SelectItem>
+                  <SelectItem value="500">500</SelectItem>
+                  <SelectItem value="1000">1000</SelectItem>
+                  <SelectItem value="2000">2000</SelectItem>
+                  <SelectItem value="5000">5000</SelectItem>
+                  <SelectItem value="0">All</SelectItem>
                 </SelectContent>
               </Select>
               {total > 0 && (

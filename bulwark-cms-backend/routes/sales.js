@@ -13,6 +13,27 @@ import path from 'path';
 
 const router = express.Router();
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const US_DATE_PATTERN = /^\d{2}-\d{2}-\d{4}$/;
+const US_SLASH_DATE_PATTERN = /^\d{2}\/\d{2}\/\d{4}$/;
+
+const normalizeCsvDate = (value) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (ISO_DATE_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (US_DATE_PATTERN.test(trimmed) || US_SLASH_DATE_PATTERN.test(trimmed)) {
+    const [month, day, year] = trimmed.split(/[-/]/);
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  return null;
+};
+
 // GET /sales/stats - Get sales statistics (must come before /:id route)
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
@@ -1240,15 +1261,25 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
         }
 
         // Parse and validate sale date
-        const saleDate = new Date(row.saleDate);
+        const normalizedSaleDate = normalizeCsvDate(row.saleDate);
+        if (!normalizedSaleDate) {
+          errors.push({
+            row: rowNumber,
+            saleDate: row.saleDate,
+            error: 'Invalid sale date format (use MM-DD-YYYY)'
+          });
+          continue;
+        }
+        const saleDate = new Date(normalizedSaleDate);
         if (isNaN(saleDate.getTime())) {
           errors.push({
             row: rowNumber,
             saleDate: row.saleDate,
-            error: 'Invalid sale date format (use YYYY-MM-DD)'
+            error: 'Invalid sale date value'
           });
           continue;
         }
+        const isoSaleDate = saleDate.toISOString().split('T')[0];
 
         // Validate status
         const validStatuses = ['active', 'cancelled', 'expired'];
@@ -1264,7 +1295,7 @@ router.post('/bulk-import', authenticateToken, upload.single('file'), async (req
           premiumAmount: premiumAmount.toString(),
           commissionAmount: commissionAmount.toString(),
           commissionRate: commissionRate ? commissionRate.toString() : null,
-          saleDate: saleDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+          saleDate: isoSaleDate,
           policyNumber: row.policyNumber || null,
           status: status,
           productName: row.productName,

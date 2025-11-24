@@ -53,6 +53,23 @@ const CLIENTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 let cachedClientsData = [];
 let cachedClientsMeta = { cacheKey: null, expiresAt: 0 };
 
+const formatDateForCsv = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    const parts = dateString.split(/[-/]/);
+    if (parts.length === 3) {
+      const [month, day, year] = parts;
+      return `${month.padStart(2, '0')}-${day.padStart(2, '0')}-${year}`;
+    }
+    return '';
+  }
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  return `${month}-${day}-${year}`;
+};
+
 const SaleForm = ({ sale, onSave, onCancel, products }) => {
   const { user, isManager, canAccessAllClients } = useAuth();
   const [clients, setClients] = useState([]);
@@ -922,7 +939,7 @@ const SalesTracking = () => {
         'Premium Amount': sale.premiumAmount || 0,
         'Commission Amount': sale.commissionAmount || 0,
         'Commission Rate (%)': sale.commissionRate || 0,
-        'Sale Date': sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
+        'Sale Date': formatDateForCsv(sale.saleDate),
         'Status': sale.status || 'Active',
         'Agent Name': `${sale.agent?.firstName || ''} ${sale.agent?.lastName || ''}`.trim() || 'N/A',
         'Agent Email': sale.agent?.email || 'N/A',
@@ -972,7 +989,7 @@ const SalesTracking = () => {
       '1500.00',
       '150.00',
       '10.00',
-      '2024-01-15',
+      '01-15-2024',
       'POL-2024-001',
       'active',
       'Initial premium payment'
@@ -1298,21 +1315,22 @@ const SalesTracking = () => {
                 {filteredSales.length > 0 ? (
                   filteredSales.map((sale) => (
                     <TableRow key={sale.id}>
-                                                                     <TableCell>
-                          <div>
-                            <div className="font-medium">{sale.client?.firstName} {sale.client?.lastName}</div>
-                            {sale.client?.email && (
-                              <div className="text-sm text-gray-500">
-                                {sale.client.email}
-                              </div>
-                            )}
-                            {sale.policyNumber && (
-                              <div className="text-sm text-gray-500">
-                                Policy: {sale.policyNumber}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{sale.client?.firstName} {sale.client?.lastName}</div>
+                          <div className="text-xs text-gray-400">ID: {sale.client?.id ?? 'N/A'}</div>
+                          {sale.client?.email && (
+                            <div className="text-sm text-gray-500">
+                              {sale.client.email}
+                            </div>
+                          )}
+                          {sale.policyNumber && (
+                            <div className="text-sm text-gray-500">
+                              Policy: {sale.policyNumber}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                        <TableCell>
                          <div className="font-medium">{sale.product?.name}</div>
                        </TableCell>
@@ -1334,7 +1352,7 @@ const SalesTracking = () => {
                        <TableCell>
                          <div className="flex items-center gap-1">
                            <Calendar className="h-3 w-3 text-gray-400" />
-                           {new Date(sale.saleDate).toLocaleDateString()}
+                           {formatDateForCsv(sale.saleDate) || 'N/A'}
                          </div>
                        </TableCell>
                       <TableCell>

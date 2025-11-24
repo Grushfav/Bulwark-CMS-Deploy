@@ -45,13 +45,47 @@ const updateGoalProgressOnClientCreate = async (agentId) => {
   }
 };
 
+// Helpers
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const US_DATE_PATTERN = /^\d{2}-\d{2}-\d{4}$/;
+const US_SLASH_DATE_PATTERN = /^\d{2}\/\d{2}\/\d{4}$/;
+
+const normalizeCsvDate = (value) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (ISO_DATE_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (US_DATE_PATTERN.test(trimmed) || US_SLASH_DATE_PATTERN.test(trimmed)) {
+    const [month, day, year] = trimmed.split(/[-/]/);
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  return null;
+};
+
 // Validation middleware
 const validateClient = [
   body('firstName').trim().isLength({ min: 2 }).withMessage('First name is required'),
   body('lastName').trim().isLength({ min: 2 }).withMessage('Last name is required'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('phone').optional().isLength({ min: 7, max: 15 }).withMessage('Phone number must be between 7 and 15 characters'),
-  body('secondaryPhone').optional().isLength({ min: 7, max: 15 }).withMessage('Secondary phone number must be between 7 and 15 characters'),
+  body('secondaryPhone').optional({ nullable: true }).custom((value) => {
+    if (value === undefined || value === null || value === '') {
+      return true;
+    }
+    const trimmed = value.toString().trim();
+    if (trimmed.length === 0) {
+      return true;
+    }
+    if (trimmed.length < 7 || trimmed.length > 15) {
+      throw new Error('Secondary phone number must be between 7 and 15 characters');
+    }
+    return true;
+  }),
   body('status').optional().isIn(['prospect', 'client']).withMessage('Valid status is required')
 ];
 
@@ -901,24 +935,17 @@ router.post('/bulk-import', authenticateToken, uploadBulk, async (req, res) => {
 
         // Parse date of birth if provided
         let dateOfBirth = null;
-        const rawDob = (data.dateofbirth || data['date_of_birth'] || '').trim();
+        const rawDob = data.dateofbirth || data['date_of_birth'];
         if (rawDob) {
-          const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
-          const usPattern = /^\d{2}[-/]\d{2}[-/]\d{4}$/;
-
-          if (isoPattern.test(rawDob)) {
-            dateOfBirth = rawDob;
-          } else if (usPattern.test(rawDob)) {
-            const parts = rawDob.split(/[-/]/);
-            const [month, day, year] = parts;
-            dateOfBirth = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          } else {
+          const normalizedDob = normalizeCsvDate(rawDob);
+          if (!normalizedDob) {
             errors.push({
               row: results.length + 1,
-              error: 'Invalid date of birth format. Use YYYY-MM-DD or MM-DD-YYYY'
+              error: 'Invalid date of birth format. Use MM-DD-YYYY'
             });
             return;
           }
+          dateOfBirth = normalizedDob;
         }
 
         const secondaryPhoneValue = data.secondaryphone || data['secondary_phone'];

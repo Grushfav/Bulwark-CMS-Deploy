@@ -97,6 +97,8 @@ const ClientForm = ({ client, onSave, onCancel }) => {
             value={formData.secondaryPhone}
             onChange={(e) => setFormData({ ...formData, secondaryPhone: e.target.value })}
             placeholder="Optional"
+            name="secondaryPhone"
+            type="tel"
           />
         </div>
         <div className="md:col-span-2">
@@ -619,7 +621,7 @@ const ClientsManagement = () => {
       client.phone,
       client.secondaryPhone,
       client.employer,
-      client.dateOfBirth,
+      formatDateForCsv(client.dateOfBirth),
       client.status,
       client.createdBy,
       client.notesCount ?? (clientNotesCache[client.id]?.length || 0)
@@ -648,7 +650,7 @@ const ClientsManagement = () => {
       'john.doe@email.com',
       '+1-555-0123',
       '+1-555-0456',
-      '1990-01-15',
+      '01-15-1990',
       'ABC Company',
       'prospect'
     ];
@@ -735,30 +737,45 @@ const ClientsManagement = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    
+  const normalizeDateString = (dateString) => {
+    if (!dateString) return null;
     const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
     const usPattern = /^\d{2}[-/]\d{2}[-/]\d{4}$/;
 
     if (isoPattern.test(dateString)) {
-      const [year, month, day] = dateString.split('-');
-      return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+      return dateString;
     }
 
     if (usPattern.test(dateString)) {
-      const parts = dateString.split(/[-/]/);
-      const [month, day, year] = parts;
-      return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+      const [month, day, year] = dateString.split(/[-/]/);
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
 
-    // Fallback to browser locale formatting if pattern is unknown
     const parsed = new Date(dateString);
     if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString();
+      return parsed.toISOString().split('T')[0];
     }
 
-    return dateString;
+    return null;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const normalized = normalizeDateString(dateString);
+    if (!normalized) return dateString;
+    const [year, month, day] = normalized.split('-');
+    return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+  };
+
+  const formatDateForCsv = (dateString) => {
+    const normalized = normalizeDateString(dateString);
+    if (!normalized) return '';
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return '';
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${month}-${day}-${year}`;
   };
 
   const getClientTypeColor = (type) => {
